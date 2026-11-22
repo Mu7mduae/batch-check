@@ -394,7 +394,10 @@ function show(id){["scrSetup","scrList","scrInv","scrLine","scrOffice"].forEach(
 function toast(t){const e=$("toast");e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2600)}
 function expArr(s){const m=String(s).match(/(\d{1,2})\D+(\d{4})/);return m?[+m[1],+m[2]]:[0,0]}
 function expTxt(s){const a=expArr(s);return a[0]?MON[a[0]-1]+" "+a[1]:String(s)}
-function split(q,levels){let r=q;const parts=[];levels.forEach((lv,i)=>{const n=i===levels.length-1?r:Math.floor(r/lv.factor);r-=n*lv.factor;if(n)parts.push(n+" "+lv.name)});return parts.join(" · ")||"0 "+levels[levels.length-1].name}
+// The smallest unit the picker counts may hold several stock units (Rotavec: Vial = 20 doses; stock and invoices in doses).
+function stockUnit(l){return l.stockUnit||l.levels[l.levels.length-1].name}
+function split(q,levels,su){let r=q;const parts=[];levels.forEach(lv=>{const n=Math.floor(r/lv.factor);r-=n*lv.factor;if(n)parts.push(n+" "+lv.name)});
+ if(r>0)parts.push(r+" "+(su||levels[levels.length-1].name));return parts.join(" · ")||"0 "+levels[levels.length-1].name}
 const STATUS_TXT={OPEN:"Not started",IN_PROGRESS:"In progress",WAITING_APPROVAL:"Waiting approval",DONE:"Done ✓",PASS:"Done ✓",ERROR:"Error"};
 
 async function api(action,body,pinOverride){
@@ -481,7 +484,7 @@ function renderInv(){
   b.innerHTML='<div class="row"><span class="big"></span><span class="chip"></span></div><div class="muted mono"></div><div></div>';
   b.querySelector(".big").textContent=l.product;const ch=b.querySelector(".chip");ch.classList.add(l.status);ch.textContent=STATUS_TXT[l.status];
   b.querySelector(".muted").textContent=l.code+" · "+l.batch+" · "+expTxt(l.expiry);
-  b.lastChild.textContent=split(l.qty,l.levels)+(l.picked&&l.status!=="PASS"?"  — last save: "+l.picked.map(x=>x.batch+" "+(x.as||x.qty)).join(" + "):"");
+  b.lastChild.textContent=split(l.qty,l.levels,l.stockUnit)+(l.picked&&l.status!=="PASS"?"  — last save: "+l.picked.map(x=>x.batch+" "+(x.as||x.qty)).join(" + "):"");
   b.onclick=()=>openLine(l);box.appendChild(b);
  });
  const s=$("invState");
@@ -497,19 +500,19 @@ $("lineBack").onclick=()=>{renderInv();show("scrInv")};
 // rest from another batch. Any batch other than the invoice batch, or a quantity above the stock report, needs
 // office approval before the invoice counts as done.
 let parts=[],pick=null; // pick = the part being scanned
-function needSplit(q,levels){let rem=q;return levels.map((lv,i)=>{const n=i===levels.length-1?rem:Math.floor(rem/lv.factor);rem-=n*lv.factor;return n})}
+function needSplit(q,levels){let rem=q;return levels.map(lv=>{const n=Math.floor(rem/lv.factor);rem-=n*lv.factor;return n})}
 function batchObj(batch){const l=curLine;if(batch===l.batch)return {batch:l.batch,exp:l.expiry,qty:l.invoiceBatchAvailable};return l.otherBatches.find(b=>b.batch===batch)||null}
 function openLine(l){
  curLine=l;parts=[];$("parts").innerHTML="";
  KNOWN=[l.batch].concat(l.otherBatches.map(x=>x.batch));
  $("lineTitle").textContent=curInv.invoice+" · line "+l.line;$("lineProduct").textContent=l.product+"  ("+l.code+")";
  $("lineBatch").textContent=l.batch;$("lineExp").textContent=expTxt(l.expiry);
- $("lineQty").textContent=split(l.qty,l.levels)+"  (= "+l.qty+" "+l.levels[l.levels.length-1].name+")";
+ $("lineQty").textContent=split(l.qty,l.levels,l.stockUnit)+"  (= "+l.qty+" "+stockUnit(l)+")";
  addPart(batchObj(l.batch),l.qty);
  refreshLine();show("scrLine");
 }
 function addPart(b,takeQty){
- const l=curLine,small=l.levels[l.levels.length-1].name;
+ const l=curLine,small=stockUnit(l);
  const p={batch:b.batch,target:b.batch,exp:b.exp,avail:b.qty,verified:false,tried:false,expOk:false,readFrom:"",el:{}};
  const c=document.createElement("div");c.className="card part";
  c.innerHTML='<div class="row"><span class="big"></span><span class="chip OPEN">Not checked</span></div>'+
@@ -540,7 +543,7 @@ function addPart(b,takeQty){
  parts.push(p);$("parts").appendChild(c);partHead(p);return p;
 }
 function partHead(p){
- const l=curLine,small=l.levels[l.levels.length-1].name,inv=p.batch===l.batch;
+ const l=curLine,small=stockUnit(l),inv=p.batch===l.batch;
  p.el.title.textContent=(inv?"Invoice batch ":"Other batch ")+p.batch;p.el.card.classList.toggle("extra",!inv);
  p.el.info.textContent="Exp "+expTxt(p.exp)+" · stock report shows "+p.avail+" "+small+(inv?" (incl. this invoice)":"")+(inv?"":" · invoice batch is "+l.batch);
  // "Use another batch" only when the product has more than one batch
@@ -563,12 +566,12 @@ function partQty(p){return curLine.levels.reduce((s,lv,i)=>s+(Number(p.el.inputs
 function partAs(p){return curLine.levels.map((lv,i)=>(Number(p.el.inputs[i].value)||0)+" "+lv.name).filter(x=>!x.startsWith("0 ")).join(" ")}
 function partChip(p){const c=p.el.chip;c.className="chip "+(p.verified?"PASS":p.tried?"ERROR":"OPEN");c.textContent=p.verified?"Batch confirmed ✓":p.tried?"Not confirmed":"Not checked"}
 function refreshLine(){
- const l=curLine,q=l.qty,unit=l.levels[l.levels.length-1].name,s=$("qtyState");let t=0,unconfirmed=false,over=false;
+ const l=curLine,q=l.qty,unit=stockUnit(l),s=$("qtyState");let t=0,unconfirmed=false,over=false;
  parts.forEach(p=>{const n=partQty(p);t+=n;p.el.warn.textContent="";
   if(n>p.avail){p.el.warn.textContent="⚠ "+n+" is more than the stock report shows for this batch ("+p.avail+") — the office will check it";over=true}
   if(n>0&&!p.verified)unconfirmed=true;});
  const used=parts.filter(p=>partQty(p)>0);
- if(!t){s.className="state";s.textContent="Invoice needs "+split(q,l.levels)}
+ if(!t){s.className="state";s.textContent="Invoice needs "+split(q,l.levels,l.stockUnit)}
  else if(t===q){s.className="state ok";s.textContent="✓ "+t+" of "+q+" "+unit+(used.length>1?" from "+used.length+" batches":"")}
  else{s.className="state bad";s.textContent=(t<q?"Short ":"Over ")+Math.abs(q-t)+" "+unit+" — picked "+t+" of "+q}
  // complete from another batch: only when short after taking something
