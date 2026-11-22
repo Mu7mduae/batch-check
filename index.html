@@ -399,9 +399,12 @@ const STATUS_TXT={OPEN:"Not started",IN_PROGRESS:"In progress",WAITING_APPROVAL:
 
 async function api(action,body,pinOverride){
  if(!cfg.api) throw new Error("no connection link");
- const pin=pinOverride||cfg.pin;let r;
- if(body) r=await fetch(cfg.api,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({},body,{action,pin}))});
- else r=await fetch(cfg.api+(cfg.api.includes("?")?"&":"?")+"action="+action+"&pin="+encodeURIComponent(pin));
+ // always GET: Safari can drop the reply to a POST because Google answers it with a redirect
+ const pin=pinOverride||cfg.pin;
+ let url=cfg.api+(cfg.api.includes("?")?"&":"?")+"action="+action+"&pin="+encodeURIComponent(pin);
+ if(body) url+="&data="+encodeURIComponent(JSON.stringify(body));
+ const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),45000);
+ let r;try{r=await fetch(url,{signal:ctl.signal})}finally{clearTimeout(tm)}
  const j=await r.json(); if(!j.ok) throw new Error(j.error==="wrong_pin"?"Wrong PIN":j.error); return j;
 }
 
@@ -584,10 +587,20 @@ $("extraAdd").onclick=()=>{const b=batchObj($("extraSel").value);if(!b)return;
 $("btnSave").onclick=async()=>{
  const btn=$("btnSave");btn.disabled=true;btn.textContent="Saving…";
  const payload=parts.filter(p=>partQty(p)>0).map(p=>({batch:p.batch,qty:partQty(p),as:partAs(p),readFrom:p.readFrom,expiry:p.expOk?"read OK":"not read",verified:p.verified}));
- try{const r=await api("pick",{invoice:curInv.invoice,line:curLine.line,parts:payload,picker:cfg.picker});
-  toast(r.saved.status==="PASS"?"Line saved ✓":r.saved.status==="WAITING_APPROVAL"?"Saved — waiting for office approval":"Not accepted: "+(r.saved.problems||[]).join("; "));
-  await loadInvoices("scrInv");if(r.saved.status==="ERROR")openLine(curInv.lines.find(x=>x.line===curLine.line)||curLine);else show("scrInv");
- }catch(e){toast("Not saved: "+e.message);refreshLine()}
+ const invNo=curInv.invoice,lineNo=curLine.line,before=curLine.pickId||"";
+ let status=null,problems=[];
+ try{const r=await api("pick",{invoice:invNo,line:lineNo,parts:payload,picker:cfg.picker});
+  status=r.saved.status;problems=r.saved.problems||[];if(r.invoices)invoices=r.invoices;
+ }catch(e){
+  // the reply was lost: ask for the list again and see whether this save was recorded
+  btn.textContent="Checking the save…";
+  try{invoices=(await api("invoices")).invoices;const l=(invoices.find(i=>i.invoice===invNo)||{lines:[]}).lines.find(x=>x.line===lineNo);
+   if(l&&(l.pickId||"")!==before)status=l.status==="ERROR"?"ERROR":l.status;}catch(e2){}
+  if(!status){toast("Not saved — no connection. Try again.");refreshLine();return}
+ }
+ toast(status==="PASS"?"Line saved ✓":status==="WAITING_APPROVAL"?"Saved — waiting for office approval":"Not accepted: "+(problems.join("; ")||"check the line"));
+ renderList();curInv=invoices.find(i=>i.invoice===invNo)||curInv;renderInv();
+ if(status==="ERROR")openLine(curInv.lines.find(x=>x.line===lineNo)||curLine);else show("scrInv");
 };
 
 // ---- reading a label: every reader gives evidence, one decision ----
