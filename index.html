@@ -1,176 +1,161 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body>
-<title>Batch Check Trial</title>
-<meta name="claude:viewport-fit-sides" content="cover">
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>KUBBAR Picking</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
-/* Layout: one narrow column for a phone in a cold room — line picker, camera button, verdict, count. */
+/* Layout: phone-first stack of screens — setup, invoices, invoice, line — plus a full-screen camera layer. */
 :root{
   --bg:#f3f6f7; --panel:#ffffff; --fg:#13232b; --muted:#5a6b73; --line:#d6e0e4;
   --accent:#0b6e8a; --accent-fg:#ffffff;
   --ok:#17803d; --ok-bg:#e3f4e8; --warn:#9a6400; --warn-bg:#fbf0d9; --bad:#b42318; --bad-bg:#fde7e5;
-  --sans:"IBM Plex Sans",system-ui,"Segoe UI",sans-serif;
-  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  color-scheme:light; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px)
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0e171b; --panel:#15222a; --fg:#e4eef2; --muted:#93a7b0; --line:#26363f;
-  --accent:#3fb3d4; --accent-fg:#06151b;
+  --bg:#0e171b; --panel:#15222a; --fg:#e4eef2; --muted:#93a7b0; --line:#26363f; --accent:#3fb3d4; --accent-fg:#06151b;
   --ok:#5fd38a; --ok-bg:#12301f; --warn:#f0b549; --warn-bg:#33270e; --bad:#ff8a80; --bad-bg:#3a1714; color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#0e171b; --panel:#15222a; --fg:#e4eef2; --muted:#93a7b0; --line:#26363f;
-  --accent:#3fb3d4; --accent-fg:#06151b;
+:root[data-theme="dark"]{--bg:#0e171b; --panel:#15222a; --fg:#e4eef2; --muted:#93a7b0; --line:#26363f; --accent:#3fb3d4; --accent-fg:#06151b;
   --ok:#5fd38a; --ok-bg:#12301f; --warn:#f0b549; --warn-bg:#33270e; --bad:#ff8a80; --bad-bg:#3a1714; color-scheme:dark}
-*{box-sizing:border-box}
-body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55}
-.wrap{max-width:560px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
-h1{font-size:1.35rem;margin:0;text-wrap:balance}
-.sub{color:var(--muted);margin:2px 0 0;font-size:.9rem}
-.tag{display:inline-block;font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:var(--warn-bg);color:var(--warn);font-weight:500}
-section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
-.step{font-size:.75rem;color:var(--muted);font-weight:500;letter-spacing:.05em;text-transform:uppercase}
-label{font-weight:500}
-select,input[type=number]{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%}
+*{box-sizing:border-box} [hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.5}
+img{max-width:100%}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+.top h1{font-size:1.05rem;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.back{font:inherit;font-size:1.3rem;line-height:1;border:0;background:none;color:var(--accent);padding:4px 8px;cursor:pointer}
+.wrap{max-width:600px;margin:0 auto;padding-block:16px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+button.card{font:inherit;color:inherit;text-align:left;cursor:pointer;width:100%}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;min-width:0}
+.row>*{min-width:0}
+.muted{color:var(--muted);font-size:.88rem}
 .mono{font-family:var(--mono)}
-.expect{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:.92rem;margin:0}
-.expect dt{color:var(--muted)} .expect dd{margin:0}
-.btns{display:flex;gap:8px;flex-wrap:wrap}
-.btn{font:inherit;font-weight:500;border:0;border-radius:10px;padding:12px 16px;cursor:pointer;background:var(--accent);color:var(--accent-fg);flex:1 1 160px;text-align:center}
+.big{font-size:1.05rem;font-weight:700}
+.chip{font-size:.78rem;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap}
+.chip.OPEN{background:var(--line);color:var(--muted)} .chip.IN_PROGRESS{background:var(--warn-bg);color:var(--warn)}
+.chip.WAITING_APPROVAL{background:var(--warn-bg);color:var(--warn)} .chip.ERROR{background:var(--bad-bg);color:var(--bad)}
+.chip.DONE,.chip.PASS{background:var(--ok-bg);color:var(--ok)}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden} .bar i{display:block;height:100%;background:var(--ok)}
+.btn{font:inherit;font-weight:700;border:0;border-radius:12px;padding:14px 16px;cursor:pointer;background:var(--accent);color:var(--accent-fg);width:100%;text-align:center}
 .btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
-.btn:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
-input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
-.status{font-size:.88rem;color:var(--muted)}
-.preview{max-width:100%;border-radius:8px;border:1px solid var(--line);max-height:260px;object-fit:contain;background:var(--bg)}
-.verdict{display:flex;flex-direction:column;gap:8px}
-.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;background:var(--bg)}
-.row .what{font-weight:500}
-.pill{font-size:.85rem;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap}
-.pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.none{background:var(--line);color:var(--muted)}
-.found{font-size:.82rem;color:var(--muted)}
-.big{font-size:1.5rem;font-weight:700;text-align:center;padding:14px;border-radius:10px}
-.big.ok{background:var(--ok-bg);color:var(--ok)} .big.bad{background:var(--bad-bg);color:var(--bad)} .big.warn{background:var(--warn-bg);color:var(--warn)}
+.btn[disabled]{opacity:.45;cursor:default}
+.btn:focus-visible,input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+input,select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;width:100%}
+label{font-weight:500;font-size:.9rem}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px}
+.grid3 label{display:flex;flex-direction:column;gap:4px}
+.state{font-weight:700;text-align:center;padding:14px;border-radius:12px}
+.state.ok{background:var(--ok-bg);color:var(--ok)} .state.bad{background:var(--bad-bg);color:var(--bad)} .state.warn{background:var(--warn-bg);color:var(--warn)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0} .kv dt{color:var(--muted)} .kv dd{margin:0;font-weight:500}
+.thumb{max-height:180px;object-fit:contain;border-radius:8px;border:1px solid var(--line);background:var(--bg)}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:50;background:var(--fg);color:var(--bg);padding:12px 16px;border-radius:12px;font-weight:500;text-align:center}
 details summary{cursor:pointer;color:var(--muted);font-size:.88rem}
-pre{white-space:pre-wrap;word-break:break-word;font-family:var(--mono);font-size:.78rem;background:var(--bg);padding:10px;border-radius:8px;max-height:220px;overflow:auto;margin:8px 0 0}
-.timings{display:flex;gap:8px;flex-wrap:wrap;font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums}
-.timings span{background:var(--bg);padding:3px 8px;border-radius:6px}
-.tappable{cursor:crosshair}
-#vSrc{white-space:normal;text-align:right}
-/* live camera: the overlay always sits on dark video, so it uses fixed light-on-dark colours */
-.camBox{position:relative;border-radius:12px;overflow:hidden;background:#000;max-width:100%}
-.camBox video{width:100%;display:block}
-.guide{position:absolute;left:8%;top:30%;width:84%;height:40%;border:4px solid #ff5a4f;border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.38);transition:border-color .15s}
-.guide.mid{border-color:#f0b549} .guide.ok{border-color:#35d07f}
-.hint{position:absolute;left:8px;right:8px;top:10px;text-align:center;color:#fff;font-weight:700;font-size:1rem;text-shadow:0 1px 3px #000}
-.meter{position:absolute;left:8px;bottom:6px;color:#cfd8dc;font-size:.7rem;text-shadow:0 1px 2px #000}
-.quality{font-size:.88rem;font-weight:500;padding:8px 12px;border-radius:8px;background:var(--warn-bg);color:var(--warn)}
-.help{font-size:.88rem;color:var(--muted)}
-.typed{display:flex;flex-direction:column;gap:6px}
-input[type=text]{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%;text-transform:uppercase}
-.count{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
-.log{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:.82rem;font-variant-numeric:tabular-nums}
-th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
-th{color:var(--muted);font-weight:500}
-@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-</style>
+pre{white-space:pre-wrap;word-break:break-word;font-family:var(--mono);font-size:.75rem;background:var(--bg);padding:8px;border-radius:8px;max-height:200px;overflow:auto}
+/* full-screen camera: always over dark video, so fixed light-on-dark colours */
+.cam{position:fixed;inset:0;z-index:100;background:#000}
+.cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cam .guide{position:absolute;left:7%;width:86%;top:35%;height:26%;border:4px solid #ff5a4f;border-radius:14px;box-shadow:0 0 0 9999px rgba(0,0,0,.45);transition:border-color .15s}
+.cam .guide.mid{border-color:#f0b549} .cam .guide.ok{border-color:#35d07f}
+.cam .hint{position:absolute;left:16px;right:16px;top:calc(env(safe-area-inset-top,0px) + 20px);text-align:center;color:#fff;font-weight:700;font-size:1.15rem;text-shadow:0 1px 4px #000}
+.cam .target{position:absolute;left:16px;right:16px;top:calc(35% - 40px);text-align:center;color:#e6f2f5;font-family:var(--mono);font-size:.95rem;text-shadow:0 1px 3px #000}
+.cam .meter{position:absolute;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 96px);text-align:center;color:#b8c6cc;font-size:.7rem;font-family:var(--mono)}
+.cam .actions{position:absolute;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);display:flex;gap:10px}
+.cam .actions button{flex:1;font:inherit;font-weight:700;border-radius:12px;padding:14px;border:0;background:rgba(255,255,255,.92);color:#0b2a33;cursor:pointer}
+.cam .actions button.cancel{background:rgba(0,0,0,.55);color:#fff;border:1px solid rgba(255,255,255,.5)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body>
 
-<div class="wrap">
-  <header>
-    <span class="tag">Trial only — writes to no sheet</span>
-    <h1>Batch check by camera</h1>
-    <p class="sub">Pick the invoice line, photograph the box label, and the page compares the batch and expiry with the line. All reading happens on the phone itself.</p>
-  </header>
+<!-- Setup -->
+<section id="scrSetup" hidden>
+  <div class="top"><h1>KUBBAR Picking — setup</h1></div>
+  <div class="wrap">
+    <div class="card">
+      <label for="cfgApi">Connection link (from the office)</label><input id="cfgApi" type="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec">
+      <label for="cfgPin">PIN</label><input id="cfgPin" type="password" inputmode="numeric" autocomplete="off">
+      <label for="cfgName">Your name</label><input id="cfgName" type="text" autocomplete="name" placeholder="e.g. Ashraf">
+      <button class="btn" id="cfgSave" type="button">Save and open invoices</button>
+      <div class="muted" id="cfgMsg"></div>
+    </div>
+  </div>
+</section>
 
-  <section>
-    <div class="step">1 · Invoice line to pick</div>
-    <label for="line">Item</label>
-    <select id="line"></select>
-    <dl class="expect" id="expect"></dl>
-  </section>
+<!-- Invoices -->
+<section id="scrList" hidden>
+  <div class="top"><h1>Invoices to pick</h1><button class="back" id="btnRefresh" type="button" aria-label="Refresh">↻</button><button class="back" id="btnSetup" type="button" aria-label="Settings">⚙</button></div>
+  <div class="wrap">
+    <div class="muted" id="engine">Loading the label reader…</div>
+    <div id="invList" class="wrap" style="padding:0"></div>
+  </div>
+</section>
 
-  <section>
-    <div class="step">2 · Photograph the label</div>
-    <div class="btns">
-      <button class="btn" id="live" type="button">🎯 Live camera</button>
-      <button class="btn ghost" id="shoot" type="button">📷 Take photo</button>
-      <button class="btn ghost" id="pick" type="button">Choose photo</button>
+<!-- One invoice -->
+<section id="scrInv" hidden>
+  <div class="top"><button class="back" id="invBack" type="button" aria-label="Back to invoices">‹</button><h1 id="invTitle"></h1></div>
+  <div class="wrap">
+    <div class="card"><div class="row"><span class="big" id="invCustomer"></span><span class="chip" id="invChip"></span></div><div class="muted" id="invMeta"></div><div class="bar"><i id="invBar"></i></div></div>
+    <div id="lineList" class="wrap" style="padding:0"></div>
+    <div class="state" id="invState"></div>
+  </div>
+</section>
+
+<!-- One line -->
+<section id="scrLine" hidden>
+  <div class="top"><button class="back" id="lineBack" type="button" aria-label="Back to invoice">‹</button><h1 id="lineTitle"></h1></div>
+  <div class="wrap">
+    <div class="card">
+      <div class="big" id="lineProduct"></div>
+      <dl class="kv"><dt>Batch</dt><dd class="mono" id="lineBatch"></dd><dt>Expiry</dt><dd class="mono" id="lineExp"></dd><dt>Quantity</dt><dd id="lineQty"></dd></dl>
+      <div class="state warn" id="changeNote" hidden></div>
     </div>
-    <div class="status" id="liveMsg" hidden></div>
-    <div class="camBox" id="camBox" hidden>
-      <video id="vid" playsinline muted autoplay></video>
-      <div class="guide" id="guide"></div>
-      <div class="hint" id="hint">Fit the batch and expiry inside the box</div>
-      <div class="meter mono" id="meter"></div>
-    </div>
-    <div class="btns" id="camBtns" hidden>
-      <button class="btn ghost" id="snapNow" type="button">Capture now</button>
-      <button class="btn ghost" id="camStop" type="button">Cancel</button>
-    </div>
-    <input type="file" id="cam" accept="image/*" capture="environment">
-    <input type="file" id="gal" accept="image/*">
-    <div class="status" id="engine">Loading text reader…</div>
-    <img id="prev" class="preview tappable" alt="Label photo — tap the batch number to read that spot" hidden>
-    <div class="quality" id="quality" hidden></div>
-    <div class="status" id="status"></div>
-    <div class="timings" id="timings" hidden></div>
-    <div class="verdict" id="verdict" hidden>
-      <div class="row"><span class="what">Batch</span><span class="pill none" id="vBatch">—</span></div>
-      <div class="found" id="fBatch"></div>
-      <div class="row"><span class="what">Expiry</span><span class="pill none" id="vExp">—</span></div>
-      <div class="found" id="fExp"></div>
-      <div class="row"><span class="what">Read from</span><span class="pill none" id="vSrc">—</span></div>
-      <div class="help" id="tapHelp" hidden>Not sure? <b>Tap the batch number on the photo</b> and the page reads that spot only. Or type it:</div>
-      <div class="typed" id="typedBox" hidden>
-        <label for="typed">Last 4 characters of the batch on the box</label>
-        <div class="count"><input type="text" id="typed" class="mono" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="e.g. A314"><button class="btn" id="typedGo" type="button" style="flex:0 0 auto">Confirm</button></div>
+
+    <div class="card">
+      <div class="row"><span class="big">1 · Check the batch</span><span class="chip" id="batchChip">Not checked</span></div>
+      <button class="btn" id="btnScan" type="button">📷 Scan label</button>
+      <img id="shot" class="thumb" alt="Label photo" hidden>
+      <div class="muted" id="scanStatus"></div>
+      <dl class="kv" id="scanResult" hidden><dt>Batch</dt><dd id="resBatch"></dd><dt>Expiry</dt><dd id="resExp"></dd><dt>Read by</dt><dd id="resSrc"></dd></dl>
+      <details id="rawBox" hidden><summary>What the camera read</summary><pre id="rawText"></pre></details>
+      <div id="typedBox" hidden>
+        <label for="typed">Can't read it? Type the last 4 characters of the batch on the box</label>
+        <div class="row"><input id="typed" class="mono" type="text" maxlength="6" autocomplete="off" autocapitalize="characters"><button class="btn" id="typedGo" type="button" style="width:auto">OK</button></div>
       </div>
+      <details id="altBox"><summary>Invoice batch not in stock? Use another batch</summary>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+          <select id="altSel"></select>
+          <div class="muted">A batch change needs office approval before the invoice counts as done.</div>
+        </div>
+      </details>
     </div>
-    <details id="raw" hidden><summary>Text the camera read</summary><pre id="rawText"></pre></details>
-  </section>
 
-  <section>
-    <div class="step">3 · Quantity picked</div>
-    <div class="count">
-      <div><label for="qty">How many <span id="unitName">pcs</span> did you pick?</label>
-      <input type="number" id="qty" min="0" inputmode="numeric" placeholder="e.g. 24"></div>
-      <button class="btn" id="check" type="button" style="flex:0 0 auto">Check</button>
+    <div class="card">
+      <span class="big">2 · Quantity picked</span>
+      <div class="grid3" id="qtyInputs"></div>
+      <div class="state" id="qtyState"></div>
     </div>
-    <div class="big" id="final" hidden></div>
-  </section>
 
-  <section>
-    <div class="step">Trial log (this session)</div>
-    <div class="log"><table><thead><tr><th>Time</th><th>Item</th><th>Batch</th><th>Expiry</th><th>Read from</th><th>Time taken</th></tr></thead><tbody id="logBody"><tr><td colspan="6" class="status">No trials yet.</td></tr></tbody></table></div>
-    <button class="btn ghost" id="copy" type="button">Copy results to send</button>
-    <div class="status" id="copyMsg"></div>
-  </section>
+    <button class="btn" id="btnSave" type="button" disabled>Save line</button>
+  </div>
+</section>
+
+<!-- Full-screen camera -->
+<div class="cam" id="cam" hidden>
+  <video id="vid" playsinline muted autoplay></video>
+  <div class="guide" id="guide"></div>
+  <div class="hint" id="hint">Fit the batch and expiry inside the box</div>
+  <div class="target" id="camTarget"></div>
+  <div class="meter" id="meter"></div>
+  <div class="actions"><button class="cancel" id="camCancel" type="button">Cancel</button><button id="camSnap" type="button">Capture now</button></div>
 </div>
+<input type="file" id="fileCam" accept="image/*" capture="environment" hidden>
+<div class="toast" id="toast" hidden></div>
+<div id="status" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist/iife/reader/index.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort.wasm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 <script>
-// Test lines taken from the live stock report on 21-Nov-2026. Trial only.
-const LINES=[
- {code:"3055",name:"Bovilis Nasalgen 3-PMH 1x10ds",batch:"9307A314",exp:[12,2027],qty:24,unit:"boxes"},
- {code:"3033",name:"Metricure 1x10 inj",batch:"A251B01",exp:[8,2028],qty:10,unit:"boxes"},
- {code:"9024",name:"Gamithromycin 50ml (Gamicure)",batch:"C314L002",exp:[11,2027],qty:1,unit:"vials"},
- {code:"3058",name:"Estrumate 1x50ml",batch:"6625102",exp:[4,2028],qty:1,unit:"boxes"},
- {code:"3030",name:"Estrumate 1x20ml",batch:"6642106",exp:[4,2028],qty:1,unit:"boxes"},
- {code:"5041",name:"Nobilis ND Clone 30 12x5000ds",batch:"SA835AA13",exp:[5,2028],qty:12,unit:"vials"},
- {code:"3055",name:"Nasalgen, other batch (rejection test)",batch:"9307A302",exp:[10,2027],qty:24,unit:"boxes"}
-];
-// Other batches of the same products in the stock report: an exact hit on one of these means a different batch was picked.
-const KNOWN=["9307A302","9307A314","9307A207","9307A232","9307A238","9307A236","9307A270","9307A279","A251B01","A252B02","A257C01","A239C01","A240C01","C314L002","6625102","6642106","6545101","5685116","SA835AA13","SA837AA11","SA853AA02","SA808AA19","SA743AA16"];
-const MON=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 const $=id=>document.getElementById(id);
-const sel=$("line");
-LINES.forEach((l,i)=>{const o=document.createElement("option");o.value=i;o.textContent=l.code+" · "+l.name;sel.appendChild(o)});
-function cur(){return LINES[+sel.value]}
-function showExpect(){const l=cur();$("expect").innerHTML="";
- [["Batch",l.batch,true],["Expiry",MON[l.exp[0]-1]+" "+l.exp[1],true],["Invoice qty",l.qty+" "+l.unit,false]].forEach(([k,v,m])=>{
-  const dt=document.createElement("dt");dt.textContent=k;const dd=document.createElement("dd");dd.textContent=v;if(m)dd.className="mono";$("expect").append(dt,dd)});
- $("unitName").textContent=l.unit; resetResult();}
-sel.addEventListener("change",showExpect);
-
+const MON=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+let KNOWN=[]; // batches of the current product: an exact hit on one that is not the target means a different batch
 // ---------- matching ----------
 const MAP={O:"0",Q:"0",I:"1",L:"1","|":"1",S:"5",B:"8",Z:"2",G:"6"};
 function norm(s){return (s||"").toUpperCase().replace(/[OQIL|SBZG]/g,c=>MAP[c]).replace(/[^A-Z0-9]/g,"")}
@@ -196,6 +181,7 @@ function findExp(text,[m,y]){
 }
 // GS1 element strings: expiry AI (17)YYMMDD
 function gs1Exp(raw){const s=raw.replace(/[()]/g,"");const k=s.search(/17(\d{6})/);if(k<0)return null;const d=s.substr(k+2,6);return [+d.substr(2,2),2000+ +d.substr(0,2)]}
+
 
 // ---------- engines ----------
 let ocr=null, detector=null, ocrReady=false, engineName="";
@@ -255,14 +241,6 @@ async function scanBarcodes(img){
 }
 function toCanvas(img,max,f){const s=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement("canvas");c.width=Math.round(img.naturalWidth*s);c.height=Math.round(img.naturalHeight*s);const x=c.getContext("2d");x.filter=f||"grayscale(1) contrast(1.35)";x.drawImage(img,0,0,c.width,c.height);return c}
 
-// ---------- flow ----------
-$("shoot").onclick=()=>$("cam").click();
-$("pick").onclick=()=>$("gal").click();
-$("cam").onchange=e=>handle(e.target.files[0]);
-$("gal").onchange=e=>handle(e.target.files[0]);
-let last=null;
-function resetResult(){["verdict","raw","timings","final","quality","tapHelp","typedBox"].forEach(i=>$(i).hidden=true);$("status").textContent="";$("typed").value="";last=null}
-function setPill(id,cls,txt){const p=$(id);p.className="pill "+cls;p.textContent=txt}
 
 // ---------- image preparation ----------
 // Draw a region of the photo, scaled, with an optional treatment:
@@ -397,154 +375,193 @@ async function readTextPaddle(img,l,region){
  return {text:all,passes};
 }
 
-let state=null; // the photo being checked: {img,l,code,tb,quality}
-async function handle(file,region){
- if(!file)return; resetResult();
- const l=cur(); const img=$("prev"); img.src=URL.createObjectURL(file); img.hidden=false;
- await img.decode().catch(()=>{});
- const q=quality(img); const qa=$("quality");
- qa.hidden=!(q.sharp<60||q.glare>0.12);
- qa.textContent=q.sharp<60?"Photo looks blurry — hold steady and retake for the best result.":"Strong glare on the label — tilt the box a little and retake.";
- const t0=performance.now();
- let code=null; const tb0=performance.now();
- try{ if(detector){const r=await detector.detect(img);if(r&&r.length)code=r.map(x=>x.rawValue).join(" | ")} }catch(e){}
- if(!code){$("status").textContent="Looking for a barcode…";try{code=await scanBarcodes(img)}catch(e){code=null;$("engine").textContent+=" (barcode reader error: "+(e&&e.message||e)+")"}}
- const tb=performance.now()-tb0;
- state={img,l,code,tb,q};
- await analyze(t0,region||null);
+
+
+// ================= app =================
+const store={get(k){try{return localStorage.getItem(k)||""}catch(e){return ""}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const cfg={api:store.get("pk_api"),pin:store.get("pk_pin"),picker:store.get("pk_name")};
+let invoices=[],curInv=null,curLine=null,pick=null;
+function show(id){["scrSetup","scrList","scrInv","scrLine"].forEach(s=>$(s).hidden=s!==id);window.scrollTo(0,0)}
+function toast(t){const e=$("toast");e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2600)}
+function expArr(s){const m=String(s).match(/(\d{1,2})\D+(\d{4})/);return m?[+m[1],+m[2]]:[0,0]}
+function expTxt(s){const a=expArr(s);return a[0]?MON[a[0]-1]+" "+a[1]:String(s)}
+function split(q,levels){let r=q;const parts=[];levels.forEach((lv,i)=>{const n=i===levels.length-1?r:Math.floor(r/lv.factor);r-=n*lv.factor;if(n)parts.push(n+" "+lv.name)});return parts.join(" · ")||"0 "+levels[levels.length-1].name}
+const STATUS_TXT={OPEN:"Not started",IN_PROGRESS:"In progress",WAITING_APPROVAL:"Waiting approval",DONE:"Done ✓",PASS:"Done ✓",ERROR:"Error"};
+
+async function api(action,body){
+ if(!cfg.api) throw new Error("no connection link");
+ let r;
+ if(body) r=await fetch(cfg.api,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({},body,{action,pin:cfg.pin}))});
+ else r=await fetch(cfg.api+(cfg.api.includes("?")?"&":"?")+"action="+action+"&pin="+encodeURIComponent(cfg.pin));
+ const j=await r.json(); if(!j.ok) throw new Error(j.error==="wrong_pin"?"Wrong PIN":j.error); return j;
 }
 
-// ---------- live camera with a guide box (red / amber / green) ----------
-// The box turns green when the label inside it is sharp, close enough to show text, evenly lit,
-// or when a barcode with the invoice batch is already readable. Three green checks in a row capture automatically.
-let stream=null,loopT=null,greens=0,tickN=0;
-const vid=$("vid"),guide=$("guide");
-function guideRect(){const vw=vid.videoWidth,vh=vid.videoHeight;return [vw*0.08,vh*0.30,vw*0.84,vh*0.40]}
-$("live").onclick=async()=>{
- $("liveMsg").hidden=true;
- try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080}},audio:false})}
- catch(e){$("liveMsg").hidden=false;$("liveMsg").textContent="Live camera is blocked on this page ("+(e&&e.name||e)+"). It needs the page to run outside claude.ai — use Take photo for now.";return}
- resetResult();$("prev").hidden=true;$("camBox").hidden=false;$("camBtns").hidden=false;
- vid.srcObject=stream;try{await vid.play()}catch(e){}
- greens=0;tickN=0;tick();
+// ---- setup ----
+function openSetup(){$("cfgApi").value=cfg.api;$("cfgPin").value=cfg.pin;$("cfgName").value=cfg.picker;show("scrSetup")}
+$("btnSetup").onclick=openSetup;
+$("cfgSave").onclick=async()=>{
+ cfg.api=$("cfgApi").value.trim();cfg.pin=$("cfgPin").value.trim();cfg.picker=$("cfgName").value.trim();
+ if(!cfg.api||!cfg.pin||!cfg.picker){$("cfgMsg").textContent="Fill in all three.";return}
+ $("cfgMsg").textContent="Checking…";
+ try{await api("invoices");store.set("pk_api",cfg.api);store.set("pk_pin",cfg.pin);store.set("pk_name",cfg.picker);loadInvoices()}
+ catch(e){$("cfgMsg").textContent="Could not connect: "+e.message}
 };
-function stopCam(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;clearTimeout(loopT);$("camBox").hidden=true;$("camBtns").hidden=true}
-$("camStop").onclick=stopCam;
-$("snapNow").onclick=()=>{if(stream)capture()};
+
+// ---- invoices ----
+async function loadInvoices(keep){
+ show(keep||"scrList");
+ if(!keep){$("invList").innerHTML='<div class="muted">Loading invoices…</div>'}
+ try{invoices=(await api("invoices")).invoices}catch(e){$("invList").innerHTML="";const d=document.createElement("div");d.className="state bad";d.textContent="Could not load invoices: "+e.message;$("invList").appendChild(d);return}
+ renderList();
+ if(curInv){curInv=invoices.find(i=>i.invoice===curInv.invoice)||null;if(curInv&&keep==="scrInv")renderInv()}
+}
+$("btnRefresh").onclick=()=>loadInvoices();
+function renderList(){
+ const box=$("invList");box.innerHTML="";
+ if(!invoices.length){box.innerHTML='<div class="card"><span class="big">No invoices to pick</span><span class="muted">New invoices appear here once the office posts them.</span></div>';return}
+ invoices.forEach(inv=>{
+  const b=document.createElement("button");b.className="card";b.type="button";
+  b.innerHTML='<div class="row"><span class="big mono"></span><span class="chip"></span></div><div class="muted"></div><div class="bar"><i></i></div>';
+  b.querySelector(".big").textContent=inv.invoice;const c=b.querySelector(".chip");c.classList.add(inv.status);c.textContent=STATUS_TXT[inv.status];
+  b.querySelector(".muted").textContent=inv.customer+" · "+inv.date+" · "+inv.done+" of "+inv.lines.length+" lines";
+  b.querySelector("i").style.width=Math.round(100*inv.done/inv.lines.length)+"%";
+  b.onclick=()=>{curInv=inv;renderInv();show("scrInv")};box.appendChild(b);
+ });
+}
+
+// ---- one invoice ----
+$("invBack").onclick=()=>{curInv=null;loadInvoices()};
+function renderInv(){
+ const inv=curInv;$("invTitle").textContent=inv.invoice;$("invCustomer").textContent=inv.customer;
+ const c=$("invChip");c.className="chip "+inv.status;c.textContent=STATUS_TXT[inv.status];
+ $("invMeta").textContent=inv.date+" · "+inv.done+" of "+inv.lines.length+" lines done";$("invBar").style.width=Math.round(100*inv.done/inv.lines.length)+"%";
+ const box=$("lineList");box.innerHTML="";
+ inv.lines.forEach(l=>{
+  const b=document.createElement("button");b.className="card";b.type="button";
+  b.innerHTML='<div class="row"><span class="big"></span><span class="chip"></span></div><div class="muted mono"></div><div></div>';
+  b.querySelector(".big").textContent=l.product;const ch=b.querySelector(".chip");ch.classList.add(l.status);ch.textContent=STATUS_TXT[l.status];
+  b.querySelector(".muted").textContent=l.code+" · "+l.batch+" · "+expTxt(l.expiry);
+  b.lastChild.textContent=split(l.qty,l.levels)+(l.picked&&l.status!=="PASS"?"  — last try: "+(l.picked.as||l.picked.qty):"");
+  b.onclick=()=>openLine(l);box.appendChild(b);
+ });
+ const s=$("invState");
+ if(inv.status==="DONE"){s.className="state ok";s.textContent="Invoice complete ✓ — all lines checked"}
+ else if(inv.status==="WAITING_APPROVAL"){s.className="state warn";s.textContent="Waiting for office approval (batch change)"}
+ else{const left=inv.lines.length-inv.done;s.className="state bad";s.textContent=left+" line"+(left>1?"s":"")+" left — the invoice is not complete until every line is checked"}
+}
+
+// ---- one line ----
+$("lineBack").onclick=()=>{renderInv();show("scrInv")};
+function openLine(l){
+ curLine=l;pick={target:l.batch,exp:l.expiry,batchOk:false,readFrom:"",expOk:false};
+ $("lineTitle").textContent=curInv.invoice+" · line "+l.line;$("lineProduct").textContent=l.product+"  ("+l.code+")";
+ $("lineQty").textContent=split(l.qty,l.levels)+"  (= "+l.qty+" "+l.levels[l.levels.length-1].name+")";
+ const sel=$("altSel");sel.innerHTML="";const o0=document.createElement("option");o0.value="";o0.textContent="Use the invoice batch "+l.batch;sel.appendChild(o0);
+ l.otherBatches.forEach(b=>{const o=document.createElement("option");o.value=b.batch;o.textContent=b.batch+" · exp "+expTxt(b.exp)+" · stock "+b.qty;sel.appendChild(o)});
+ $("altBox").hidden=!l.otherBatches.length;$("altBox").open=false;sel.value="";
+ const qi=$("qtyInputs");qi.innerHTML="";
+ l.levels.forEach((lv,i)=>{const lab=document.createElement("label");lab.textContent=lv.name+(lv.factor>1?" (×"+lv.factor+")":"");const inp=document.createElement("input");inp.type="number";inp.min="0";inp.inputMode="numeric";inp.id="q"+i;inp.placeholder="0";inp.oninput=refreshLine;lab.appendChild(inp);qi.appendChild(lab)});
+ setTarget();resetScan();refreshLine();show("scrLine");
+}
+function setTarget(){
+ const l=curLine,alt=$("altSel").value,b=alt?l.otherBatches.find(x=>x.batch===alt):null;
+ pick.target=b?b.batch:l.batch;pick.exp=b?b.exp:l.expiry;
+ $("lineBatch").textContent=pick.target;$("lineExp").textContent=expTxt(pick.exp);
+ const n=$("changeNote");n.hidden=!b;n.textContent=b?"Batch changed from "+l.batch+" to "+b.batch+" — needs office approval":"";
+ KNOWN=[l.batch].concat(l.otherBatches.map(x=>x.batch));
+}
+$("altSel").onchange=()=>{setTarget();resetScan();refreshLine()};
+function resetScan(){pick.batchOk=false;pick.expOk=false;pick.readFrom="";$("shot").hidden=true;$("scanResult").hidden=true;$("rawBox").hidden=true;$("typedBox").hidden=true;$("scanStatus").textContent="";$("typed").value="";setChip()}
+function setChip(){const c=$("batchChip");c.className="chip "+(pick.batchOk?"PASS":pick.tried?"ERROR":"OPEN");c.textContent=pick.batchOk?"Batch confirmed ✓":pick.tried?"Not confirmed":"Not checked"}
+function total(){return curLine.levels.reduce((s,lv,i)=>s+(Number($("q"+i).value)||0)*lv.factor,0)}
+function refreshLine(){
+ const t=total(),q=curLine.qty,s=$("qtyState"),unit=curLine.levels[curLine.levels.length-1].name;
+ if(!t){s.className="state";s.textContent="Invoice needs "+split(q,curLine.levels)}
+ else if(t===q){s.className="state ok";s.textContent="✓ "+t+" of "+q+" "+unit}
+ else{s.className="state bad";s.textContent=(t<q?"Short ":"Over ")+Math.abs(q-t)+" "+unit+" — picked "+t+" of "+q}
+ $("btnSave").disabled=!(pick.batchOk&&t===q);
+ $("btnSave").textContent=!pick.batchOk?"Check the batch first":t!==q?"Quantity must match the invoice":"Save line";
+}
+$("typedGo").onclick=()=>{const t=norm($("typed").value),B=norm(pick.target);if(t.length<4)return;
+ pick.tried=true;pick.batchOk=B.endsWith(t);pick.readFrom=pick.batchOk?"typed":"";if(!pick.batchOk)toast("That is not batch "+pick.target+" — check the box");setChip();refreshLine()};
+$("btnSave").onclick=async()=>{
+ const btn=$("btnSave");btn.disabled=true;btn.textContent="Saving…";
+ const as=curLine.levels.map((lv,i)=>(Number($("q"+i).value)||0)+" "+lv.name).filter(x=>!x.startsWith("0 ")).join(" ");
+ try{const r=await api("pick",{invoice:curInv.invoice,line:curLine.line,batch:pick.target,batchOk:pick.batchOk,readFrom:pick.readFrom,expiry:pick.expOk?"read OK":"not read",qty:total(),as,picker:cfg.picker});
+  toast(r.saved.status==="PASS"?"Line saved ✓":r.saved.status==="WAITING_APPROVAL"?"Saved — waiting for office approval":"Saved with an error");
+  await loadInvoices("scrInv");show("scrInv");
+ }catch(e){toast("Not saved: "+e.message);refreshLine()}
+};
+
+// ---- reading a label: every reader gives evidence, one decision ----
+async function verify(img,region){
+ const tgt={batch:pick.target,exp:expArr(pick.exp)};const ev=[];let raw="";
+ const add=(name,txt,gs)=>{const ex=gs?(gs[0]===tgt.exp[0]&&gs[1]===tgt.exp[1]?"ok":"bad"):findExp(txt,tgt.exp);ev.push({name,b:findBatch(txt,tgt.batch),ex});raw+="["+name+"] "+(txt.trim()||"(nothing)")+"\n\n"};
+ $("scanStatus").textContent="Reading the barcode…";
+ let code=null;try{code=await scanBarcodes(img)}catch(e){}
+ if(code)add("Barcode",code,gs1Exp(code));
+ if(engineName==="paddle"){$("scanStatus").textContent="Reading the printed text…";try{add("PaddleOCR",(await readTextPaddle(img,tgt,region)).text)}catch(e){}}
+ const okN=ev.filter(e=>e.b.r==="ok").length,otherN=ev.filter(e=>e.b.r==="other").length;
+ if((okN===0&&otherN===0)||(okN&&otherN)){$("scanStatus").textContent="Asking a third reader…";if(await initTesseract()){try{add("Tesseract",(await readText(img,tgt,region)).text)}catch(e){}}}
+ const other=ev.find(e=>e.b.r==="other"),ok=ev.find(e=>e.b.r==="ok"),near=ev.find(e=>e.b.r==="near");
+ return {b:other?other.b:ok?{r:"ok"}:near?near.b:{r:"bad"},ex:ev.some(e=>e.ex==="ok")?"ok":"bad",src:ev.map(e=>e.name+" "+(e.b.r==="ok"?"✓":e.b.r==="other"?"✗":"–")).join(" · ")||"nothing",raw};
+}
+async function checkPhoto(blob,region){
+ const img=$("shot");img.src=URL.createObjectURL(blob);img.hidden=false;await new Promise(r=>{if(img.complete&&img.naturalWidth)r();else{img.onload=r;img.onerror=r}});
+ const res=await verify(img,region);pick.tried=true;
+ pick.batchOk=res.b.r==="ok";pick.expOk=res.ex==="ok";pick.readFrom=res.src;
+ $("scanStatus").textContent="";$("scanResult").hidden=false;$("rawBox").hidden=false;$("rawText").textContent=res.raw;
+ $("resBatch").textContent=res.b.r==="ok"?"✓ "+pick.target:res.b.r==="other"?"✗ Box says "+res.b.got+" — take batch "+pick.target:res.b.r==="near"?"⚠ Read "+res.b.got+" — close, scan again or type it":"✗ Not found — scan closer, or type it";
+ $("resExp").textContent=pick.expOk?"✓ "+expTxt(pick.exp):"Not read (expected "+expTxt(pick.exp)+")";
+ $("resSrc").textContent=res.src;$("typedBox").hidden=pick.batchOk||res.b.r==="other";
+ setChip();refreshLine();
+}
+
+// ---- full-screen camera with a guide box ----
+let stream=null,loopT=null,greens=0,tickN=0;const vid=$("vid"),guide=$("guide");
+$("btnScan").onclick=async()=>{
+ try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080}},audio:false})}
+ catch(e){$("fileCam").click();return} // no live camera: fall back to the phone's camera app
+ $("camTarget").textContent="Batch "+pick.target+" · exp "+expTxt(pick.exp);
+ $("cam").hidden=false;document.body.style.overflow="hidden";vid.srcObject=stream;try{await vid.play()}catch(e){}
+ greens=0;tickN=0;guide.className="guide";tick();
+};
+$("fileCam").onchange=e=>{const f=e.target.files[0];e.target.value="";if(f)checkPhoto(f,null)};
+function stopCam(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;clearTimeout(loopT);$("cam").hidden=true;document.body.style.overflow=""}
+$("camCancel").onclick=stopCam;$("camSnap").onclick=()=>{if(stream)capture()};
+// the guide box on screen, in video pixels (the video fills the screen with object-fit:cover)
+function guideRect(){
+ const vr=vid.getBoundingClientRect(),gr=guide.getBoundingClientRect(),vw=vid.videoWidth,vh=vid.videoHeight;
+ const s=Math.max(vr.width/vw,vr.height/vh),ox=(vw*s-vr.width)/2,oy=(vh*s-vr.height)/2;
+ const x=Math.max(0,(gr.left-vr.left+ox)/s),y=Math.max(0,(gr.top-vr.top+oy)/s);
+ return [x,y,Math.min(vw-x,gr.width/s),Math.min(vh-y,gr.height/s)];
+}
 function frameStats(c){
- const W=c.width,H=c.height,p=c.getContext("2d",{willReadFrequently:true}).getImageData(0,0,W,H).data;
- let m=0,m2=0,k=0,edge=0,hot=0,lum=0;
- for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){const i=(y*W+x)*4;const g=p[i];const L=4*g-p[i-4]-p[i+4]-p[i-W*4]-p[i+W*4];m+=L;m2+=L*L;k++;if(Math.abs(L)>40)edge++;if(g>=250)hot++;lum+=g}
+ const W=c.width,H=c.height,p=c.getContext("2d",{willReadFrequently:true}).getImageData(0,0,W,H).data;let m=0,m2=0,k=0,edge=0,hot=0,lum=0;
+ for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){const i=(y*W+x)*4,g=p[i],L=4*g-p[i-4]-p[i+4]-p[i-W*4]-p[i+W*4];m+=L;m2+=L*L;k++;if(Math.abs(L)>40)edge++;if(g>=250)hot++;lum+=g}
  m/=k;return {sharp:m2/k-m*m,edge:edge/k,glare:hot/k,lum:lum/k};
 }
 async function tick(){
- if(!stream)return;
- if(!vid.videoWidth){loopT=setTimeout(tick,200);return}
- const [gx,gy,gw,gh]=guideRect(),s=Math.min(1,480/gw),c=document.createElement("canvas");c.width=Math.round(gw*s);c.height=Math.round(gh*s);
- const g=c.getContext("2d",{willReadFrequently:true});g.filter="grayscale(1)";g.drawImage(vid,gx,gy,gw,gh,0,0,c.width,c.height);
- const st=frameStats(c);
- // every third check, try the barcode reader on the box at full resolution
+ if(!stream)return;if(!vid.videoWidth){loopT=setTimeout(tick,200);return}
+ const [gx,gy,gw,gh]=guideRect(),s=Math.min(1,480/gw),c=document.createElement("canvas");c.width=Math.max(8,Math.round(gw*s));c.height=Math.max(8,Math.round(gh*s));
+ const g=c.getContext("2d",{willReadFrequently:true});g.filter="grayscale(1)";g.drawImage(vid,gx,gy,gw,gh,0,0,c.width,c.height);const st=frameStats(c);
  let codeHit=false;
- if(++tickN%3===0&&window.ZXingWASM){try{const fc=document.createElement("canvas");fc.width=gw;fc.height=gh;fc.getContext("2d").drawImage(vid,gx,gy,gw,gh,0,0,gw,gh);const t=await scanBarcodes(fc);codeHit=!!t&&findBatch(t,cur().batch).r==="ok"}catch(e){}}
+ if(++tickN%3===0&&window.ZXingWASM){try{const fc=document.createElement("canvas");fc.width=Math.round(gw);fc.height=Math.round(gh);fc.getContext("2d").drawImage(vid,gx,gy,gw,gh,0,0,fc.width,fc.height);const t=await scanBarcodes(fc);codeHit=!!t&&findBatch(t,pick.target).r==="ok"}catch(e){}}
  let level="bad",hint;
- if(st.lum<45)hint="More light, please";
- else if(st.glare>0.08)hint="Glare — tilt the box a little";
- else if(st.edge<0.035)hint="Move closer — fit the batch inside the box";
- else if(st.sharp<70)hint="Hold steady — the label is blurred";
- else if(st.sharp<150){level="mid";hint="Almost — hold steady"}
- else{level="ok";hint="Hold still…"}
+ if(st.lum<45)hint="More light, please";else if(st.glare>0.08)hint="Glare — tilt the box a little";else if(st.edge<0.035)hint="Move closer — fit the batch inside the box";
+ else if(st.sharp<70)hint="Hold steady — the label is blurred";else if(st.sharp<150){level="mid";hint="Almost — hold steady"}else{level="ok";hint="Hold still…"}
  if(codeHit){level="ok";hint="Barcode found — hold still…"}
  guide.className="guide"+(level==="ok"?" ok":level==="mid"?" mid":"");$("hint").textContent=hint;
  $("meter").textContent="sharp "+Math.round(st.sharp)+" · text "+Math.round(st.edge*100)+"% · glare "+Math.round(st.glare*100)+"%";
- greens=level==="ok"?greens+1:0;
- if(greens>=3||codeHit){capture();return}
+ greens=level==="ok"?greens+1:0;if(greens>=3||codeHit){capture();return}
  loopT=setTimeout(tick,250);
 }
 async function capture(){
  const vw=vid.videoWidth,vh=vid.videoHeight,region=guideRect(),c=document.createElement("canvas");c.width=vw;c.height=vh;c.getContext("2d").drawImage(vid,0,0,vw,vh);
- stopCam();
- const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",0.95));
- // read the guide box first; the whole frame is still searched for barcodes
- await handle(blob,region);
-}
-// Tap on the photo: read only the spot around the tap.
-$("prev").addEventListener("click",async e=>{
- if(!state||!ocrReady)return;
- const img=state.img,r=img.getBoundingClientRect();
- // object-fit:contain — work out where the picture sits inside the element
- const s=Math.min(r.width/img.naturalWidth,r.height/img.naturalHeight),ox=(r.width-img.naturalWidth*s)/2,oy=(r.height-img.naturalHeight*s)/2;
- const x=(e.clientX-r.left-ox)/s,y=(e.clientY-r.top-oy)/s; if(x<0||y<0||x>img.naturalWidth||y>img.naturalHeight)return;
- const W=img.naturalWidth,H=img.naturalHeight,bw=W*0.6,bh=H*0.09;
- await analyze(performance.now(),[Math.max(0,x-bw/2),Math.max(0,y-bh/2),Math.min(bw,W-Math.max(0,x-bw/2)),Math.min(bh,H-Math.max(0,y-bh/2))]);
-});
-$("typedGo").onclick=()=>{
- if(!state)return;const t=norm($("typed").value),B=norm(state.l.batch);if(t.length<4)return;
- const ok=B.endsWith(t);
- render(ok?{r:"ok"}:{r:"typedbad",got:$("typed").value.toUpperCase()},last?last.ex:"bad",ok?"typed by picker":"typed — no match",0,0,performance.now(),last?last.text:"");
-};
-
-async function analyze(t0,region){
- // Every reader gives its own evidence; the decision uses all of them.
- const {img,l,code,tb}=state; const ev=[]; let raw="";
- const add=(name,txt,gsExp)=>{const ex=gsExp?(gsExp[0]===l.exp[0]&&gsExp[1]===l.exp[1]?"ok":"bad"):findExp(txt,l.exp);
-  ev.push({name,b:findBatch(txt,l.batch),ex});raw+="["+name+"] "+(txt.trim()||"(nothing)")+"\n\n"};
- if(code) add("Barcode",code,gs1Exp(code));
- const to0=performance.now();
- if(engineName==="paddle"){try{add("PaddleOCR",(await readTextPaddle(img,l,region)).text)}catch(e){$("status").textContent="PaddleOCR error: "+(e&&e.message||e)}}
- // third opinion: only when nothing confirmed the batch yet, or two readers disagree
- const okN=ev.filter(e=>e.b.r==="ok").length, otherN=ev.filter(e=>e.b.r==="other").length;
- if((okN===0&&otherN===0)||(okN&&otherN)){ $("status").textContent="Asking a third reader (Tesseract)…";
-  if(await initTesseract()){try{add("Tesseract",(await readText(img,l,region)).text)}catch(e){}} }
- const to=performance.now()-to0;
- // fuse: a reader that sees a DIFFERENT known batch wins (safety); else any exact match confirms
- const other=ev.find(e=>e.b.r==="other"), ok=ev.find(e=>e.b.r==="ok"), near=ev.find(e=>e.b.r==="near");
- const b=other?other.b:ok?{r:"ok"}:near?near.b:{r:"bad"};
- const ex=ev.some(e=>e.ex==="ok")?"ok":"bad";
- const mark=e=>e.b.r==="ok"?"✅":e.b.r==="other"?"❌":e.b.r==="near"?"⚠️":"—";
- const src=ev.length?ev.map(e=>e.name+" "+mark(e)).join(" · "):"nothing";
- state.ev=ev;
- render(b,ex,(region?"spot: ":"")+src,tb,to,t0,raw);
+ stopCam();const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",0.95));await checkPhoto(blob,region);
 }
 
-function render(b,ex,src,tb,to,t0,raw){
- const l=state.l,total=performance.now()-t0;
- $("verdict").hidden=false;
- setPill("vBatch",b.r==="ok"?"ok":b.r==="near"?"warn":"bad", b.r==="ok"?"✅ Match":b.r==="near"?"⚠️ Close — check by eye":b.r==="other"?"❌ Different batch":b.r==="typedbad"?"❌ Typed batch differs":"❌ Not found");
- $("fBatch").textContent = b.r==="near" ? "Read: "+b.got+" — expected: "+l.batch : b.r==="other" ? "Box says "+b.got+", invoice needs "+l.batch+". Put it back and take the right batch." : b.r==="typedbad" ? "You typed "+b.got+" — that is not the invoice batch. Check the box." : b.r==="bad" ? "Expected "+l.batch+". Photo unclear or batch not on this side." : "";
- const needHelp=b.r==="bad"||b.r==="near"; $("tapHelp").hidden=!needHelp; $("typedBox").hidden=!needHelp&&b.r!=="typedbad";
- setPill("vExp",ex==="ok"?"ok":"bad",ex==="ok"?"✅ Match":"❌ Not found");
- $("fExp").textContent = ex==="ok" ? "" : "Expected "+MON[l.exp[0]-1]+" "+l.exp[1];
- setPill("vSrc","none",src);
- const tm=$("timings");tm.hidden=false;tm.innerHTML="";
- [["Barcode",tb],["Text",to],["Total",total]].forEach(([k,v])=>{const s=document.createElement("span");s.textContent=k+": "+(v/1000).toFixed(1)+" s";tm.appendChild(s)});
- $("raw").hidden=false; $("rawText").textContent=raw;
- $("status").textContent="";
- last={l,b:b.r,ex,src,secs:total/1000,text:raw,sharp:state.q.sharp};
- addLog(last);
-}
-
-const logs=[];
-function addLog(x){logs.push({t:new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}),code:x.l.code+" "+x.l.batch,b:x.b,ex:x.ex,src:x.src,secs:x.secs});
- const tb=$("logBody");tb.innerHTML="";
- logs.slice().reverse().forEach(r=>{const tr=document.createElement("tr");
-  [r.t,r.code,r.b==="ok"?"✅":r.b==="near"?"⚠️":r.b==="other"?"❌ other batch":"❌",r.ex==="ok"?"✅":"❌",r.src,r.secs.toFixed(1)+" s"].forEach(v=>{const td=document.createElement("td");td.textContent=v;tr.appendChild(td)});tb.appendChild(tr)})}
-
-$("check").onclick=()=>{
- const f=$("final");f.hidden=false;const q=$("qty").value;
- if(!last){f.className="big warn";f.textContent="Photograph the label first";return}
- if(q===""){f.className="big warn";f.textContent="Enter the quantity";return}
- const l=last.l, n=+q;
- if(last.b==="other"){f.className="big bad";f.textContent="ERROR — different batch";return}
- if(last.b!=="ok"){f.className="big bad";f.textContent="ERROR — batch not confirmed";return}
- if(last.ex!=="ok"){f.className="big warn";f.textContent="Batch OK, expiry not read";return}
- if(n!==l.qty){f.className="big bad";f.textContent="ERROR — picked "+n+", invoice "+l.qty+" ("+(n>l.qty?"over ":"short ")+Math.abs(n-l.qty)+")";return}
- f.className="big ok";f.textContent="PASS ✅";
-};
-$("copy").onclick=async()=>{
- const txt=logs.map(r=>[r.t,r.code,"batch:"+r.b,"exp:"+r.ex,r.src,r.secs.toFixed(1)+"s"].join(" | ")).join("\n")||"no trials";
- try{await navigator.clipboard.writeText(txt);$("copyMsg").textContent="Copied ✓"}catch(e){$("copyMsg").textContent=txt}
-};
-showExpect();
+// ---- start ----
+if(cfg.api&&cfg.pin&&cfg.picker)loadInvoices();else openSetup();
 </script>
-
 </body></html>
