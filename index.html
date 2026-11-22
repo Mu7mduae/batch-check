@@ -91,7 +91,8 @@ pre{white-space:pre-wrap;word-break:break-word;font-family:var(--mono);font-size
 <section id="scrList" hidden>
   <div class="top"><h1>Invoices to pick</h1><button class="back" id="btnOffice" type="button" aria-label="Office view" title="Office view">📋</button><button class="back" id="btnRefresh" type="button" aria-label="Refresh">↻</button><button class="back" id="btnSetup" type="button" aria-label="Settings">⚙</button></div>
   <div class="wrap">
-    <div class="muted" id="engine">Loading the label reader…</div>
+    <div class="muted" id="engine" hidden>Loading the label reader…</div>
+    <input id="search" type="search" placeholder="🔍 Search invoice, customer, product or batch" autocomplete="off" aria-label="Search invoices">
     <div id="invList" class="wrap" style="padding:0"></div>
   </div>
 </section>
@@ -424,10 +425,15 @@ async function loadInvoices(keep){
  if(curInv){curInv=invoices.find(i=>i.invoice===curInv.invoice)||null;if(curInv&&keep==="scrInv")renderInv()}
 }
 $("btnRefresh").onclick=()=>loadInvoices();
+$("search").oninput=()=>renderList();
 function renderList(){
  const box=$("invList");box.innerHTML="";
  if(!invoices.length){box.innerHTML='<div class="card"><span class="big">No invoices to pick</span><span class="muted">New invoices appear here once the office posts them.</span></div>';return}
- invoices.forEach(inv=>{
+ const q=$("search").value.trim().toUpperCase();
+ const hit=inv=>!q||[inv.invoice,inv.customer].concat(inv.lines.flatMap(l=>[l.code,l.product,l.batch])).some(s=>String(s||"").toUpperCase().includes(q));
+ const shown=invoices.filter(hit);
+ if(!shown.length){const d=document.createElement("div");d.className="muted";d.textContent="No invoice matches “"+$("search").value+"”";box.appendChild(d);return}
+ shown.forEach(inv=>{
   const b=document.createElement("button");b.className="card";b.type="button";
   b.innerHTML='<div class="row"><span class="big mono"></span><span class="chip"></span></div><div class="muted"></div><div class="bar"><i></i></div>';
   b.querySelector(".big").textContent=inv.invoice;const c=b.querySelector(".chip");c.classList.add(inv.status);c.textContent=STATUS_TXT[inv.status];
@@ -483,38 +489,44 @@ function renderInv(){
 
 // ---- one line ----
 $("lineBack").onclick=()=>{renderInv();show("scrInv")};
-// A line is picked as one or more "parts": the invoice batch first, and only if it is short, extra batches
-// chosen from the batches that the stock report shows in stock for this product.
+// A line is picked as one or more "parts". The first part is the invoice batch; the picker may switch it to any
+// other batch of the same product in the stock report ("Use another batch"), and if still short, complete the
+// rest from another batch. Any batch other than the invoice batch, or a quantity above the stock report, needs
+// office approval before the invoice counts as done.
 let parts=[],pick=null; // pick = the part being scanned
 function needSplit(q,levels){let rem=q;return levels.map((lv,i)=>{const n=i===levels.length-1?rem:Math.floor(rem/lv.factor);rem-=n*lv.factor;return n})}
+function batchObj(batch){const l=curLine;if(batch===l.batch)return {batch:l.batch,exp:l.expiry,qty:l.invoiceBatchAvailable};return l.otherBatches.find(b=>b.batch===batch)||null}
 function openLine(l){
  curLine=l;parts=[];$("parts").innerHTML="";
  KNOWN=[l.batch].concat(l.otherBatches.map(x=>x.batch));
  $("lineTitle").textContent=curInv.invoice+" · line "+l.line;$("lineProduct").textContent=l.product+"  ("+l.code+")";
  $("lineBatch").textContent=l.batch;$("lineExp").textContent=expTxt(l.expiry);
  $("lineQty").textContent=split(l.qty,l.levels)+"  (= "+l.qty+" "+l.levels[l.levels.length-1].name+")";
- addPart({batch:l.batch,exp:l.expiry,avail:l.invoiceBatchAvailable,isInv:true},l.qty);
+ addPart(batchObj(l.batch),l.qty);
  refreshLine();show("scrLine");
 }
 function addPart(b,takeQty){
  const l=curLine,small=l.levels[l.levels.length-1].name;
- const p=Object.assign({},b,{target:b.batch,verified:false,tried:false,expOk:false,readFrom:"",el:{}});
- const c=document.createElement("div");c.className="card part"+(b.isInv?"":" extra");
+ const p={batch:b.batch,target:b.batch,exp:b.exp,avail:b.qty,verified:false,tried:false,expOk:false,readFrom:"",el:{}};
+ const c=document.createElement("div");c.className="card part";
  c.innerHTML='<div class="row"><span class="big"></span><span class="chip OPEN">Not checked</span></div>'+
-  '<div class="muted"></div>'+
+  '<div class="muted info"></div>'+
   '<button class="btn scan" type="button">📷 Scan label</button>'+
+  '<button class="btn ghost altbtn" type="button">Use another batch</button>'+
+  '<div class="alt" hidden style="display:flex;flex-direction:column;gap:8px"><label>Batch you are taking</label><select></select><button class="btn sw" type="button">Use this batch</button></div>'+
   '<img class="thumb" alt="Label photo" hidden><div class="muted st"></div>'+
   '<dl class="kv res" hidden><dt>Batch</dt><dd class="rb"></dd><dt>Expiry</dt><dd class="re"></dd><dt>Read by</dt><dd class="rs"></dd></dl>'+
+  '<button class="btn ghost useread" type="button" hidden></button>'+
   '<details class="raw" hidden><summary>What the camera read</summary><pre></pre></details>'+
   '<div class="typed" hidden><label>Can\'t read it? Type the last 4 characters of the batch on the box</label>'+
   '<div class="row"><input class="mono" type="text" maxlength="6" autocomplete="off" autocapitalize="characters"><button class="btn tg" type="button" style="width:auto">OK</button></div></div>'+
   '<div class="grid3 qty"></div><div class="muted warnq"></div>';
- c.querySelector(".big").textContent=(b.isInv?"Invoice batch ":"Extra batch ")+b.batch;
- c.querySelector(".muted").textContent="Exp "+expTxt(b.exp)+" · stock report shows "+b.avail+" "+small+(b.isInv?" (incl. this invoice)":"");
- if(!b.isInv){const x=document.createElement("button");x.className="x";x.type="button";x.textContent="Remove";x.onclick=()=>{parts=parts.filter(q=>q!==p);c.remove();refreshLine()};c.firstChild.appendChild(x)}
- p.el={card:c,chip:c.querySelector(".chip"),img:c.querySelector("img"),st:c.querySelector(".st"),res:c.querySelector(".res"),rb:c.querySelector(".rb"),re:c.querySelector(".re"),rs:c.querySelector(".rs"),
-  raw:c.querySelector(".raw"),typed:c.querySelector(".typed"),warn:c.querySelector(".warnq"),inputs:[]};
+ if(parts.length){const x=document.createElement("button");x.className="x";x.type="button";x.textContent="Remove";x.onclick=()=>{parts=parts.filter(q=>q!==p);c.remove();refreshLine()};c.firstChild.appendChild(x)}
+ p.el={card:c,title:c.querySelector(".big"),info:c.querySelector(".info"),chip:c.querySelector(".chip"),img:c.querySelector("img"),st:c.querySelector(".st"),res:c.querySelector(".res"),rb:c.querySelector(".rb"),re:c.querySelector(".re"),rs:c.querySelector(".rs"),
+  raw:c.querySelector(".raw"),typed:c.querySelector(".typed"),warn:c.querySelector(".warnq"),altbtn:c.querySelector(".altbtn"),alt:c.querySelector(".alt"),altSel:c.querySelector(".alt select"),useread:c.querySelector(".useread"),inputs:[]};
  c.querySelector(".scan").onclick=()=>startScan(p);
+ p.el.altbtn.onclick=()=>{fillAlt(p);p.el.alt.hidden=!p.el.alt.hidden};
+ c.querySelector(".sw").onclick=()=>{const b=batchObj(p.el.altSel.value);if(b)switchPart(p,b,"")};
  c.querySelector(".tg").onclick=()=>{const t=norm(c.querySelector(".typed input").value),B=norm(p.batch);if(t.length<4)return;
   p.tried=true;p.verified=B.endsWith(t);p.readFrom=p.verified?"typed":"";if(!p.verified)toast("That is not batch "+p.batch+" — check the box");partChip(p);refreshLine()};
  const need=needSplit(takeQty,l.levels),qi=c.querySelector(".qty");
@@ -522,31 +534,52 @@ function addPart(b,takeQty){
   const fx=document.createElement("span");fx.className="muted";fx.textContent=lv.factor>1?"1 = "+lv.factor+" "+small:" ";lab.appendChild(fx);
   const tk=document.createElement("span");tk.className="take";tk.innerHTML="Take <b></b>";tk.querySelector("b").textContent=need[i];lab.appendChild(tk);
   const inp=document.createElement("input");inp.type="number";inp.min="0";inp.inputMode="numeric";inp.placeholder="0";inp.oninput=refreshLine;lab.appendChild(inp);qi.appendChild(lab);p.el.inputs.push(inp)});
- parts.push(p);$("parts").appendChild(c);return p;
+ parts.push(p);$("parts").appendChild(c);partHead(p);return p;
+}
+function partHead(p){
+ const l=curLine,small=l.levels[l.levels.length-1].name,inv=p.batch===l.batch;
+ p.el.title.textContent=(inv?"Invoice batch ":"Other batch ")+p.batch;p.el.card.classList.toggle("extra",!inv);
+ p.el.info.textContent="Exp "+expTxt(p.exp)+" · stock report shows "+p.avail+" "+small+(inv?" (incl. this invoice)":"")+(inv?"":" · invoice batch is "+l.batch);
+ // "Use another batch" only when the product has more than one batch
+ p.el.altbtn.hidden=!l.otherBatches.length;
+}
+function fillAlt(p){
+ const l=curLine,used=parts.filter(q=>q!==p).map(q=>q.batch),sel=p.el.altSel;sel.innerHTML="";
+ [batchObj(l.batch)].concat(l.otherBatches).filter(b=>b.batch!==p.batch&&!used.includes(b.batch)).forEach(b=>{
+  const o=document.createElement("option");o.value=b.batch;o.textContent=b.batch+(b.batch===l.batch?" (invoice batch)":"")+" · exp "+expTxt(b.exp)+" · stock "+b.qty;sel.appendChild(o)});
+}
+// Change the batch of a part. verifiedBy = the reader that already read this batch on the box ("" = scan it now).
+function switchPart(p,b,verifiedBy){
+ p.batch=p.target=b.batch;p.exp=b.exp;p.avail=b.qty;p.verified=!!verifiedBy;p.tried=!!verifiedBy;p.readFrom=verifiedBy||"";p.expOk=false;
+ p.el.alt.hidden=true;p.el.useread.hidden=true;p.el.typed.hidden=true;
+ if(!verifiedBy){p.el.res.hidden=true;p.el.raw.hidden=true;p.el.img.hidden=true}
+ else{p.el.rb.textContent="✓ "+b.batch;p.el.re.textContent="Exp "+expTxt(b.exp)}
+ partHead(p);partChip(p);refreshLine();
 }
 function partQty(p){return curLine.levels.reduce((s,lv,i)=>s+(Number(p.el.inputs[i].value)||0)*lv.factor,0)}
 function partAs(p){return curLine.levels.map((lv,i)=>(Number(p.el.inputs[i].value)||0)+" "+lv.name).filter(x=>!x.startsWith("0 ")).join(" ")}
 function partChip(p){const c=p.el.chip;c.className="chip "+(p.verified?"PASS":p.tried?"ERROR":"OPEN");c.textContent=p.verified?"Batch confirmed ✓":p.tried?"Not confirmed":"Not checked"}
 function refreshLine(){
- const l=curLine,q=l.qty,unit=l.levels[l.levels.length-1].name,s=$("qtyState");let t=0,problem="";
+ const l=curLine,q=l.qty,unit=l.levels[l.levels.length-1].name,s=$("qtyState");let t=0,unconfirmed=false,over=false;
  parts.forEach(p=>{const n=partQty(p);t+=n;p.el.warn.textContent="";
-  if(n>p.avail){p.el.warn.textContent="⚠ "+n+" is more than the stock report shows for this batch ("+p.avail+")";problem=problem||"over stock"}
-  if(n>0&&!p.verified)problem=problem||"check";});
+  if(n>p.avail){p.el.warn.textContent="⚠ "+n+" is more than the stock report shows for this batch ("+p.avail+") — the office will check it";over=true}
+  if(n>0&&!p.verified)unconfirmed=true;});
+ const used=parts.filter(p=>partQty(p)>0);
  if(!t){s.className="state";s.textContent="Invoice needs "+split(q,l.levels)}
- else if(t===q){s.className="state ok";s.textContent="✓ "+t+" of "+q+" "+unit+(parts.filter(p=>partQty(p)>0).length>1?" from "+parts.filter(p=>partQty(p)>0).length+" batches":"")}
+ else if(t===q){s.className="state ok";s.textContent="✓ "+t+" of "+q+" "+unit+(used.length>1?" from "+used.length+" batches":"")}
  else{s.className="state bad";s.textContent=(t<q?"Short ":"Over ")+Math.abs(q-t)+" "+unit+" — picked "+t+" of "+q}
- // "complete from another batch" only when short after something was taken, and only batches not already used
- const used=parts.map(p=>p.batch),free=l.otherBatches.filter(b=>!used.includes(b.batch));
- // last option: after taking from the invoice batch and still short, or when the stock report already shows it short
- $("extraBox").hidden=!(t<q&&free.length&&(t>0||parts[0].avail<q));
- const sel=$("extraSel"),keep=sel.value;sel.innerHTML="";free.forEach(b=>{const o=document.createElement("option");o.value=b.batch;o.textContent=b.batch+" · exp "+expTxt(b.exp)+" · stock "+b.qty;sel.appendChild(o)});if(free.some(b=>b.batch===keep))sel.value=keep;
- const extra=parts.some(p=>!p.isInv&&partQty(p)>0);
- $("changeNote").hidden=!extra;$("changeNote").textContent="Includes another batch — the office must approve before the invoice is done";
- const ok=t===q&&!problem;$("btnSave").disabled=!ok;
- $("btnSave").textContent=problem==="check"?"Confirm every batch first":problem==="over stock"?"More than the batch stock":t!==q?"Quantity must match the invoice":"Save line";
+ // complete from another batch: only when short after taking something
+ const taken=parts.map(p=>p.batch),free=[batchObj(l.batch)].concat(l.otherBatches).filter(b=>!taken.includes(b.batch));
+ $("extraBox").hidden=!(t>0&&t<q&&free.length);
+ const sel=$("extraSel"),keep=sel.value;sel.innerHTML="";free.forEach(b=>{const o=document.createElement("option");o.value=b.batch;o.textContent=b.batch+(b.batch===l.batch?" (invoice batch)":"")+" · exp "+expTxt(b.exp)+" · stock "+b.qty;sel.appendChild(o)});if(free.some(b=>b.batch===keep))sel.value=keep;
+ const changed=used.some(p=>p.batch!==l.batch);
+ $("changeNote").hidden=!(changed||over);
+ $("changeNote").textContent=changed&&over?"Another batch and more than the stock report — the office must approve":changed?"Not the invoice batch — the office must approve before the invoice is done":"More than the stock report — the office must approve";
+ const ok=t===q&&!unconfirmed;$("btnSave").disabled=!ok;
+ $("btnSave").textContent=unconfirmed?"Confirm every batch first":t!==q?"Quantity must match the invoice":(changed||over)?"Save line (needs office approval)":"Save line";
 }
-$("extraAdd").onclick=()=>{const b=curLine.otherBatches.find(x=>x.batch===$("extraSel").value);if(!b)return;
- const t=parts.reduce((s,p)=>s+partQty(p),0);const p=addPart({batch:b.batch,exp:b.exp,avail:b.qty,isInv:false},Math.max(0,curLine.qty-t));
+$("extraAdd").onclick=()=>{const b=batchObj($("extraSel").value);if(!b)return;
+ const t=parts.reduce((s,p)=>s+partQty(p),0);const p=addPart(b,Math.max(0,curLine.qty-t));
  refreshLine();p.el.card.scrollIntoView({behavior:"smooth",block:"start"})};
 $("btnSave").onclick=async()=>{
  const btn=$("btnSave");btn.disabled=true;btn.textContent="Saving…";
@@ -579,6 +612,10 @@ async function checkPhoto(blob,region){
  e.rb.textContent=res.b.r==="ok"?"✓ "+p.batch:res.b.r==="other"?"✗ Box says "+res.b.got+" — this part needs batch "+p.batch:res.b.r==="near"?"⚠ Read "+res.b.got+" — close, scan again or type it":"✗ Not found — scan closer, or type it";
  e.re.textContent=p.expOk?"✓ "+expTxt(p.exp):"Not read (expected "+expTxt(p.exp)+")";
  e.rs.textContent=res.src;e.typed.hidden=p.verified||res.b.r==="other";
+ // the box shows another batch of this product: offer to take that batch instead (already read, so confirmed)
+ e.useread.hidden=true;
+ if(res.b.r==="other"){const b=batchObj(res.b.got)||batchObj(curLine.otherBatches.map(x=>x.batch).find(x=>norm(x)===norm(res.b.got)));
+  if(b&&!parts.some(q=>q!==p&&q.batch===b.batch)){e.useread.hidden=false;e.useread.textContent="Take batch "+b.batch+" instead"+(b.batch===curLine.batch?" (invoice batch)":"");e.useread.onclick=()=>switchPart(p,b,res.src.replace(/✗/g,"✓"))}}
  // a wrong batch in hand is recorded for the office, even if the picker corrects it afterwards
  if(res.b.r==="other")api("attempt",{invoice:curInv.invoice,line:curLine.line,code:curLine.code,expected:p.batch,read:res.b.got,readFrom:res.src,picker:cfg.picker}).catch(()=>{});
  partChip(p);refreshLine();
