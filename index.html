@@ -1,0 +1,550 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body>
+<title>Batch Check Trial</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one narrow column for a phone in a cold room — line picker, camera button, verdict, count. */
+:root{
+  --bg:#f3f6f7; --panel:#ffffff; --fg:#13232b; --muted:#5a6b73; --line:#d6e0e4;
+  --accent:#0b6e8a; --accent-fg:#ffffff;
+  --ok:#17803d; --ok-bg:#e3f4e8; --warn:#9a6400; --warn-bg:#fbf0d9; --bad:#b42318; --bad-bg:#fde7e5;
+  --sans:"IBM Plex Sans",system-ui,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e171b; --panel:#15222a; --fg:#e4eef2; --muted:#93a7b0; --line:#26363f;
+  --accent:#3fb3d4; --accent-fg:#06151b;
+  --ok:#5fd38a; --ok-bg:#12301f; --warn:#f0b549; --warn-bg:#33270e; --bad:#ff8a80; --bad-bg:#3a1714; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e171b; --panel:#15222a; --fg:#e4eef2; --muted:#93a7b0; --line:#26363f;
+  --accent:#3fb3d4; --accent-fg:#06151b;
+  --ok:#5fd38a; --ok-bg:#12301f; --warn:#f0b549; --warn-bg:#33270e; --bad:#ff8a80; --bad-bg:#3a1714; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55}
+.wrap{max-width:560px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+h1{font-size:1.35rem;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:2px 0 0;font-size:.9rem}
+.tag{display:inline-block;font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:var(--warn-bg);color:var(--warn);font-weight:500}
+section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.step{font-size:.75rem;color:var(--muted);font-weight:500;letter-spacing:.05em;text-transform:uppercase}
+label{font-weight:500}
+select,input[type=number]{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%}
+.mono{font-family:var(--mono)}
+.expect{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:.92rem;margin:0}
+.expect dt{color:var(--muted)} .expect dd{margin:0}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font:inherit;font-weight:500;border:0;border-radius:10px;padding:12px 16px;cursor:pointer;background:var(--accent);color:var(--accent-fg);flex:1 1 160px;text-align:center}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.btn:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.status{font-size:.88rem;color:var(--muted)}
+.preview{max-width:100%;border-radius:8px;border:1px solid var(--line);max-height:260px;object-fit:contain;background:var(--bg)}
+.verdict{display:flex;flex-direction:column;gap:8px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;background:var(--bg)}
+.row .what{font-weight:500}
+.pill{font-size:.85rem;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap}
+.pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.none{background:var(--line);color:var(--muted)}
+.found{font-size:.82rem;color:var(--muted)}
+.big{font-size:1.5rem;font-weight:700;text-align:center;padding:14px;border-radius:10px}
+.big.ok{background:var(--ok-bg);color:var(--ok)} .big.bad{background:var(--bad-bg);color:var(--bad)} .big.warn{background:var(--warn-bg);color:var(--warn)}
+details summary{cursor:pointer;color:var(--muted);font-size:.88rem}
+pre{white-space:pre-wrap;word-break:break-word;font-family:var(--mono);font-size:.78rem;background:var(--bg);padding:10px;border-radius:8px;max-height:220px;overflow:auto;margin:8px 0 0}
+.timings{display:flex;gap:8px;flex-wrap:wrap;font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.timings span{background:var(--bg);padding:3px 8px;border-radius:6px}
+.tappable{cursor:crosshair}
+#vSrc{white-space:normal;text-align:right}
+/* live camera: the overlay always sits on dark video, so it uses fixed light-on-dark colours */
+.camBox{position:relative;border-radius:12px;overflow:hidden;background:#000;max-width:100%}
+.camBox video{width:100%;display:block}
+.guide{position:absolute;left:8%;top:30%;width:84%;height:40%;border:4px solid #ff5a4f;border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.38);transition:border-color .15s}
+.guide.mid{border-color:#f0b549} .guide.ok{border-color:#35d07f}
+.hint{position:absolute;left:8px;right:8px;top:10px;text-align:center;color:#fff;font-weight:700;font-size:1rem;text-shadow:0 1px 3px #000}
+.meter{position:absolute;left:8px;bottom:6px;color:#cfd8dc;font-size:.7rem;text-shadow:0 1px 2px #000}
+.quality{font-size:.88rem;font-weight:500;padding:8px 12px;border-radius:8px;background:var(--warn-bg);color:var(--warn)}
+.help{font-size:.88rem;color:var(--muted)}
+.typed{display:flex;flex-direction:column;gap:6px}
+input[type=text]{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%;text-transform:uppercase}
+.count{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
+.log{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.82rem;font-variant-numeric:tabular-nums}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--muted);font-weight:500}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="tag">Trial only — writes to no sheet</span>
+    <h1>Batch check by camera</h1>
+    <p class="sub">Pick the invoice line, photograph the box label, and the page compares the batch and expiry with the line. All reading happens on the phone itself.</p>
+  </header>
+
+  <section>
+    <div class="step">1 · Invoice line to pick</div>
+    <label for="line">Item</label>
+    <select id="line"></select>
+    <dl class="expect" id="expect"></dl>
+  </section>
+
+  <section>
+    <div class="step">2 · Photograph the label</div>
+    <div class="btns">
+      <button class="btn" id="live" type="button">🎯 Live camera</button>
+      <button class="btn ghost" id="shoot" type="button">📷 Take photo</button>
+      <button class="btn ghost" id="pick" type="button">Choose photo</button>
+    </div>
+    <div class="status" id="liveMsg" hidden></div>
+    <div class="camBox" id="camBox" hidden>
+      <video id="vid" playsinline muted autoplay></video>
+      <div class="guide" id="guide"></div>
+      <div class="hint" id="hint">Fit the batch and expiry inside the box</div>
+      <div class="meter mono" id="meter"></div>
+    </div>
+    <div class="btns" id="camBtns" hidden>
+      <button class="btn ghost" id="snapNow" type="button">Capture now</button>
+      <button class="btn ghost" id="camStop" type="button">Cancel</button>
+    </div>
+    <input type="file" id="cam" accept="image/*" capture="environment">
+    <input type="file" id="gal" accept="image/*">
+    <div class="status" id="engine">Loading text reader…</div>
+    <img id="prev" class="preview tappable" alt="Label photo — tap the batch number to read that spot" hidden>
+    <div class="quality" id="quality" hidden></div>
+    <div class="status" id="status"></div>
+    <div class="timings" id="timings" hidden></div>
+    <div class="verdict" id="verdict" hidden>
+      <div class="row"><span class="what">Batch</span><span class="pill none" id="vBatch">—</span></div>
+      <div class="found" id="fBatch"></div>
+      <div class="row"><span class="what">Expiry</span><span class="pill none" id="vExp">—</span></div>
+      <div class="found" id="fExp"></div>
+      <div class="row"><span class="what">Read from</span><span class="pill none" id="vSrc">—</span></div>
+      <div class="help" id="tapHelp" hidden>Not sure? <b>Tap the batch number on the photo</b> and the page reads that spot only. Or type it:</div>
+      <div class="typed" id="typedBox" hidden>
+        <label for="typed">Last 4 characters of the batch on the box</label>
+        <div class="count"><input type="text" id="typed" class="mono" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="e.g. A314"><button class="btn" id="typedGo" type="button" style="flex:0 0 auto">Confirm</button></div>
+      </div>
+    </div>
+    <details id="raw" hidden><summary>Text the camera read</summary><pre id="rawText"></pre></details>
+  </section>
+
+  <section>
+    <div class="step">3 · Quantity picked</div>
+    <div class="count">
+      <div><label for="qty">How many <span id="unitName">pcs</span> did you pick?</label>
+      <input type="number" id="qty" min="0" inputmode="numeric" placeholder="e.g. 24"></div>
+      <button class="btn" id="check" type="button" style="flex:0 0 auto">Check</button>
+    </div>
+    <div class="big" id="final" hidden></div>
+  </section>
+
+  <section>
+    <div class="step">Trial log (this session)</div>
+    <div class="log"><table><thead><tr><th>Time</th><th>Item</th><th>Batch</th><th>Expiry</th><th>Read from</th><th>Time taken</th></tr></thead><tbody id="logBody"><tr><td colspan="6" class="status">No trials yet.</td></tr></tbody></table></div>
+    <button class="btn ghost" id="copy" type="button">Copy results to send</button>
+    <div class="status" id="copyMsg"></div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/zxing-wasm@2.2.4/dist/iife/reader/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort.wasm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script>
+// Test lines taken from the live stock report on 21-Nov-2026. Trial only.
+const LINES=[
+ {code:"3055",name:"Bovilis Nasalgen 3-PMH 1x10ds",batch:"9307A314",exp:[12,2027],qty:24,unit:"boxes"},
+ {code:"3033",name:"Metricure 1x10 inj",batch:"A251B01",exp:[8,2028],qty:10,unit:"boxes"},
+ {code:"9024",name:"Gamithromycin 50ml (Gamicure)",batch:"C314L002",exp:[11,2027],qty:1,unit:"vials"},
+ {code:"3058",name:"Estrumate 1x50ml",batch:"6625102",exp:[4,2028],qty:1,unit:"boxes"},
+ {code:"3030",name:"Estrumate 1x20ml",batch:"6642106",exp:[4,2028],qty:1,unit:"boxes"},
+ {code:"5041",name:"Nobilis ND Clone 30 12x5000ds",batch:"SA835AA13",exp:[5,2028],qty:12,unit:"vials"},
+ {code:"3055",name:"Nasalgen, other batch (rejection test)",batch:"9307A302",exp:[10,2027],qty:24,unit:"boxes"}
+];
+// Other batches of the same products in the stock report: an exact hit on one of these means a different batch was picked.
+const KNOWN=["9307A302","9307A314","9307A207","9307A232","9307A238","9307A236","9307A270","9307A279","A251B01","A252B02","A257C01","A239C01","A240C01","C314L002","6625102","6642106","6545101","5685116","SA835AA13","SA837AA11","SA853AA02","SA808AA19","SA743AA16"];
+const MON=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+const $=id=>document.getElementById(id);
+const sel=$("line");
+LINES.forEach((l,i)=>{const o=document.createElement("option");o.value=i;o.textContent=l.code+" · "+l.name;sel.appendChild(o)});
+function cur(){return LINES[+sel.value]}
+function showExpect(){const l=cur();$("expect").innerHTML="";
+ [["Batch",l.batch,true],["Expiry",MON[l.exp[0]-1]+" "+l.exp[1],true],["Invoice qty",l.qty+" "+l.unit,false]].forEach(([k,v,m])=>{
+  const dt=document.createElement("dt");dt.textContent=k;const dd=document.createElement("dd");dd.textContent=v;if(m)dd.className="mono";$("expect").append(dt,dd)});
+ $("unitName").textContent=l.unit; resetResult();}
+sel.addEventListener("change",showExpect);
+
+// ---------- matching ----------
+const MAP={O:"0",Q:"0",I:"1",L:"1","|":"1",S:"5",B:"8",Z:"2",G:"6"};
+function norm(s){return (s||"").toUpperCase().replace(/[OQIL|SBZG]/g,c=>MAP[c]).replace(/[^A-Z0-9]/g,"")}
+function lev(a,b){const m=a.length,n=b.length;let p=Array.from({length:n+1},(_,j)=>j);for(let i=1;i<=m;i++){const c=[i];for(let j=1;j<=n;j++)c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1));p=c}return p[n]}
+function findBatch(text,batch){
+ const T=norm(text),B=norm(batch);
+ if(!B) return {r:"none"};
+ if(T.includes(B)) return {r:"ok"};
+ const other=KNOWN.find(k=>norm(k)!==B&&T.includes(norm(k)));
+ if(other) return {r:"other",got:other};
+ const tol=B.length>=8?2:B.length>=6?1:0; let best=null;
+ if(tol){for(let i=0;i+B.length<=T.length;i++){const w=T.substr(i,B.length);const d=lev(w,B);if(d<=tol&&(!best||d<best.d))best={d,w}}}
+ if(best) return {r:"near",got:best.w};
+ return {r:"bad"};
+}
+function findExp(text,[m,y]){
+ const T=norm(text),mm=String(m).padStart(2,"0"),yy=String(y).slice(2);
+ const c=[MON[m-1]+y, MON[m-1]+yy, mm+y, y+mm].map(norm);
+ if(c.some(x=>T.includes(x))) return "ok";
+ // short date written YY.MM.DD / YYMMDD where the reader dropped the century or the dots: a 6–8 digit run with YYMM inside
+ const runs=(text||"").toUpperCase().replace(/[OQ]/g,"0").replace(/[.\-\/ ]/g,"").match(/\d{6,8}/g)||[];
+ return runs.some(r=>r.includes(yy+mm))?"ok":"bad";
+}
+// GS1 element strings: expiry AI (17)YYMMDD
+function gs1Exp(raw){const s=raw.replace(/[()]/g,"");const k=s.search(/17(\d{6})/);if(k<0)return null;const d=s.substr(k+2,6);return [+d.substr(2,2),2000+ +d.substr(0,2)]}
+
+// ---------- engines ----------
+let ocr=null, detector=null, ocrReady=false, engineName="";
+// PaddleOCR (PP-OCRv4): a detection model finds text lines, a recognition model reads each line. Runs on the phone via ONNX Runtime.
+const P={det:null,rec:null,keys:null};
+async function initPaddle(){
+ if(!window.ort) throw new Error("ONNX runtime did not load");
+ ort.env.wasm.numThreads=1; ort.env.wasm.proxy=false; ort.env.wasm.wasmPaths=new URL("./",document.baseURI).href;
+ const get=async u=>{const r=await fetch(u);if(!r.ok)throw new Error(u+" HTTP "+r.status);return new Uint8Array(await r.arrayBuffer())};
+ $("engine").textContent="Downloading the text reader (about 27 MB)…";
+ const [d,r,k]=await Promise.all([get("det.wasm"),get("rec.wasm"),fetch("keys.txt").then(x=>x.text())]);
+ $("engine").textContent="Starting the text reader…";
+ P.det=await ort.InferenceSession.create(d,{executionProviders:["wasm"]});
+ P.rec=await ort.InferenceSession.create(r,{executionProviders:["wasm"]});
+ P.keys=k.split(/\r?\n/); if(P.keys[P.keys.length-1]==="")P.keys.pop(); P.keys.push(" ");
+}
+(async()=>{
+ try{ if("BarcodeDetector" in window){const f=await BarcodeDetector.getSupportedFormats();const want=["data_matrix","code_128","qr_code","ean_13","gs1_databar","itf"].filter(x=>f.includes(x));if(want.length)detector=new BarcodeDetector({formats:want})} }catch(e){}
+ try{ await initPaddle(); ocrReady=true; engineName="paddle";
+  $("engine").textContent="Ready ✓ — barcode reader + PaddleOCR (+ Tesseract as a third opinion when needed)"; return;
+ }catch(e){ $("engine").textContent="PaddleOCR failed ("+(e&&e.message||e)+"), using the basic reader…"; }
+ if(await initTesseract()){ocrReady=true;engineName="tesseract";$("engine").textContent="Ready ✓ — basic text reader + barcode reader"}
+})();
+// Tesseract: loaded only when a third opinion is needed (or PaddleOCR failed).
+let tessP=null;
+function initTesseract(){ if(tessP) return tessP; return tessP=(async()=>{ try{
+  // Check the language file is reachable, then give the reader a worker that serves it from this page's own files.
+  const LANG=new URL("eng-traineddata.wasm",document.baseURI).href;
+  let resp; try{resp=await fetch(LANG,{method:"GET"})}catch(e){throw new Error("language file did not download ("+(e&&e.message||e)+")")}
+  if(!resp.ok) throw new Error("language file HTTP "+resp.status);
+  const shim="const L="+JSON.stringify(LANG)+";const F=self.fetch.bind(self);self.fetch=(u,o)=>String(u).endsWith('eng.traineddata.gz')?F(L):F(u,o);importScripts('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js');";
+  const workerURL=URL.createObjectURL(new Blob([shim],{type:"application/javascript"}));
+  ocr=await Tesseract.createWorker("eng",1,{workerPath:workerURL,workerBlobURL:false,corePath:"https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1/",langPath:"https://lang.local/eng",cacheMethod:"none"});
+  return true;
+ }catch(e){ $("status").textContent="Tesseract did not start: "+(e&&e.message||e); return false; } })(); }
+
+// Barcode reader: zxing-cpp (WebAssembly). Finds small, tilted DataMatrix / Code 128 anywhere in the photo.
+let zxReady=null;
+function initZX(){
+ if(zxReady) return zxReady;
+ if(!window.ZXingWASM) return zxReady=Promise.resolve(false);
+ const wasm=new URL("zxing_reader.wasm",document.baseURI).href;
+ ZXingWASM.prepareZXingModule({overrides:{locateFile:(p,pre)=>p.endsWith(".wasm")?wasm:pre+p},fireImmediately:true});
+ return zxReady=Promise.resolve(true);
+}
+async function scanBarcodes(img){
+ if(!(await initZX())) return null;
+ if(img instanceof HTMLCanvasElement){const res=await ZXingWASM.readBarcodes(img.getContext("2d").getImageData(0,0,img.width,img.height),{formats:["DataMatrix","Code128","QRCode","EAN-13"],tryHarder:true,tryRotate:true,maxNumberOfSymbols:4});const t=res.filter(r=>r.isValid&&r.text).map(r=>r.text);return t.length?t.join(" | "):null}
+ const found=[];
+ for(const max of [3000,1600]){
+  const c=toCanvas(img,max,"none"); const data=c.getContext("2d").getImageData(0,0,c.width,c.height);
+  const res=await ZXingWASM.readBarcodes(data,{formats:["DataMatrix","Code128","QRCode","EAN-13"],tryHarder:true,tryRotate:true,tryDownscale:true,maxNumberOfSymbols:4});
+  res.filter(r=>r.isValid&&r.text).forEach(r=>{if(!found.includes(r.text))found.push(r.text)});
+  if(found.some(t=>/\((01|02|10|17)\)/.test(t))) break;
+ }
+ return found.length?found.join(" | "):null;
+}
+function toCanvas(img,max,f){const s=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement("canvas");c.width=Math.round(img.naturalWidth*s);c.height=Math.round(img.naturalHeight*s);const x=c.getContext("2d");x.filter=f||"grayscale(1) contrast(1.35)";x.drawImage(img,0,0,c.width,c.height);return c}
+
+// ---------- flow ----------
+$("shoot").onclick=()=>$("cam").click();
+$("pick").onclick=()=>$("gal").click();
+$("cam").onchange=e=>handle(e.target.files[0]);
+$("gal").onchange=e=>handle(e.target.files[0]);
+let last=null;
+function resetResult(){["verdict","raw","timings","final","quality","tapHelp","typedBox"].forEach(i=>$(i).hidden=true);$("status").textContent="";$("typed").value="";last=null}
+function setPill(id,cls,txt){const p=$(id);p.className="pill "+cls;p.textContent=txt}
+
+// ---------- image preparation ----------
+// Draw a region of the photo, scaled, with an optional treatment:
+//  "gray"  grayscale + contrast            "otsu"  black/white at the best threshold
+//  "dots"  blur then black/white then thicken dark strokes — joins dot-matrix (inkjet) print into solid letters
+//  "inv"   same as otsu but inverted (light print on dark background)
+function prep(img,[sx,sy,sw,sh],scale,mode){
+ const c=document.createElement("canvas");c.width=Math.max(1,Math.round(sw*scale));c.height=Math.max(1,Math.round(sh*scale));
+ const g=c.getContext("2d",{willReadFrequently:true});
+ const blur=mode==="dots"?Math.max(1,Math.round(scale*1.2)):0;
+ g.filter="grayscale(1) contrast(1.35)"+(blur?" blur("+blur+"px)":"");
+ g.drawImage(img,sx,sy,sw,sh,0,0,c.width,c.height);
+ if(mode==="gray") return c;
+ const d=g.getImageData(0,0,c.width,c.height),p=d.data,n=c.width*c.height,v=new Uint8Array(n),hist=new Array(256).fill(0);
+ for(let i=0;i<n;i++){v[i]=p[i*4];hist[v[i]]++}
+ let sum=0;for(let i=0;i<256;i++)sum+=i*hist[i];let sB=0,wB=0,best=0,th=128;
+ for(let t=0;t<256;t++){wB+=hist[t];if(!wB)continue;const wF=n-wB;if(!wF)break;sB+=t*hist[t];const mB=sB/wB,mF=(sum-sB)/wF,b=wB*wF*(mB-mF)*(mB-mF);if(b>best){best=b;th=t}}
+ let dark=new Uint8Array(n);for(let i=0;i<n;i++)dark[i]=(v[i]<=th)!==(mode==="inv")?1:0;
+ if(mode==="dots"){const W=c.width,H=c.height,o=new Uint8Array(n);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){let k=0;for(let dy=-1;dy<=1&&!k;dy++)for(let dx=-1;dx<=1;dx++){const yy=y+dy,xx=x+dx;if(yy>=0&&yy<H&&xx>=0&&xx<W&&dark[yy*W+xx]){k=1;break}}o[y*W+x]=k}dark=o}
+ for(let i=0;i<n;i++){const val=dark[i]?0:255;p[i*4]=p[i*4+1]=p[i*4+2]=val;p[i*4+3]=255}
+ g.putImageData(d,0,0);return c;
+}
+// Photo quality: sharpness (variance of the Laplacian) and glare (share of blown-out pixels).
+function quality(img){
+ const s=Math.min(1,800/Math.max(img.naturalWidth,img.naturalHeight)),W=Math.round(img.naturalWidth*s),H=Math.round(img.naturalHeight*s);
+ const c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d",{willReadFrequently:true});g.filter="grayscale(1)";g.drawImage(img,0,0,W,H);
+ const p=g.getImageData(0,0,W,H).data;let m=0,m2=0,k=0,hot=0;
+ for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){const i=(y*W+x)*4,L=4*p[i]-p[i-4]-p[i+4]-p[i-W*4]-p[i+W*4];m+=L;m2+=L*L;k++;if(p[i]>=250)hot++}
+ m/=k;return {sharp:Math.round(m2/k-m*m),glare:hot/k};
+}
+// Characters the reader may output for this line: the batch's own characters, digits, and what dates use.
+function whitelistFor(l){const s=new Set((l.batch+"0123456789"+MON[l.exp[0]-1]+"-./ ").toUpperCase());return [...s].join("")}
+async function ocrRun(canvas,psm,wl){
+ await ocr.setParameters({tessedit_pageseg_mode:String(psm),tessedit_char_whitelist:wl||""});
+ const r=await ocr.recognize(canvas,{},{text:true,blocks:true});
+ return r.data;
+}
+function linesOf(data){const out=[];(data.blocks||[]).forEach(b=>(b.paragraphs||[]).forEach(p=>(p.lines||[]).forEach(L=>out.push(L))));return out}
+// Closeness of a piece of text to the batch: 0 = contains it exactly.
+function closeness(text,batch){const T=norm(text),B=norm(batch);if(T.includes(B))return 0;let best=B.length;for(let i=0;i<=Math.max(0,T.length-B.length);i++)best=Math.min(best,lev(T.substr(i,B.length),B));return best}
+
+// Read the printed text: whole photo first to find the text lines, then each promising line again, enlarged,
+// in several treatments, with only the expected characters allowed. Stops as soon as the batch is found.
+async function readText(img,l,region){
+ const W=img.naturalWidth,H=img.naturalHeight,wl=whitelistFor(l);let all="",passes=0;
+ const done=()=>{const r=findBatch(all,l.batch).r;return (r==="ok"||r==="other")&&findExp(all,l.exp)==="ok"};
+ const say=t=>$("status").textContent=t;
+ let cands=[];
+ if(region){ cands=[{box:region,h:region[3]/2}]; }
+ else{
+  const sc=Math.min(1,1600/Math.max(W,H));
+  for(const mode of ["gray","dots"]){
+   passes++;say("Reading printed text… (pass "+passes+")");
+   const d=await ocrRun(prep(img,[0,0,W,H],sc,mode),11,"");all+="\n"+(d.text||"");
+   linesOf(d).forEach(L=>{const b=L.bbox;cands.push({box:[b.x0/sc,b.y0/sc,(b.x1-b.x0)/sc,(b.y1-b.y0)/sc],h:(b.y1-b.y0)/sc,t:L.text})});
+   if(done())return {text:all,passes};
+  }
+  // keep only lines that already look a bit like the batch; at most 4, so a photo without the batch fails fast
+  const lim=Math.ceil(norm(l.batch).length/2);
+  cands=cands.filter(c=>/[0-9]/.test(c.t||"")&&c.box[2]>8&&c.box[3]>4).map(c=>({...c,d:closeness(c.t,l.batch)}))
+   .filter(c=>c.d<=lim).sort((a,b)=>a.d-b.d).slice(0,4);
+ }
+ for(const c of cands){
+  const [x,y,w,h]=c.box,pad=Math.max(6,h*0.6),bx=[Math.max(0,x-pad),Math.max(0,y-pad),Math.min(W,x+w+pad)-Math.max(0,x-pad),Math.min(H,y+h+pad)-Math.max(0,y-pad)];
+  const scale=Math.max(1,Math.min(5,48/Math.max(4,c.h)));
+  for(const mode of ["gray","dots","otsu","inv"]){
+   passes++;say("Reading the batch line… (pass "+passes+")");
+   const d=await ocrRun(prep(img,bx,scale,mode),region?6:7,wl);all+="\n"+(d.text||"");
+   if(done())return {text:all,passes};
+   if(findBatch(all,l.batch).r==="ok"&&mode!=="gray")break;
+  }
+ }
+ return {text:all,passes};
+}
+
+// ---------- PaddleOCR ----------
+// Find text lines in a region of the photo. Returns boxes [x,y,w,h] in photo pixels.
+async function pDetect(img,[sx,sy,sw,sh],maxSide){
+ const s=Math.min(1,maxSide/Math.max(sw,sh)),W=Math.max(32,Math.round(sw*s/32)*32),H=Math.max(32,Math.round(sh*s/32)*32);
+ const c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d",{willReadFrequently:true});g.drawImage(img,sx,sy,sw,sh,0,0,W,H);
+ const p=g.getImageData(0,0,W,H).data,n=W*H,f=new Float32Array(3*n);
+ for(let i=0;i<n;i++){f[i]=(p[i*4]/255-0.485)/0.229;f[n+i]=(p[i*4+1]/255-0.456)/0.224;f[2*n+i]=(p[i*4+2]/255-0.406)/0.225}
+ const o=await P.det.run({[P.det.inputNames[0]]:new ort.Tensor("float32",f,[1,3,H,W])});const prob=o[P.det.outputNames[0]].data;
+ // threshold, thicken by one pixel (joins dot-matrix print), then connected regions
+ const bin=new Uint8Array(n);for(let i=0;i<n;i++)if(prob[i]>0.3){bin[i]=1}
+ const dil=new Uint8Array(n);for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(bin[y*W+x]){for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const yy=y+dy,xx=x+dx;if(yy>=0&&yy<H&&xx>=0&&xx<W)dil[yy*W+xx]=1}}}
+ const lab=new Int32Array(n),boxes=[],q=new Int32Array(n);let id=0;
+ for(let i=0;i<n;i++){if(!dil[i]||lab[i])continue;id++;let h=0,t=0;q[t++]=i;lab[i]=id;let x0=W,y0=H,x1=0,y1=0,cnt=0,sp=0;
+  while(h<t){const j=q[h++],x=j%W,y=(j/W)|0;cnt++;sp+=prob[j];if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;
+   if(x>0&&dil[j-1]&&!lab[j-1]){lab[j-1]=id;q[t++]=j-1}if(x<W-1&&dil[j+1]&&!lab[j+1]){lab[j+1]=id;q[t++]=j+1}
+   if(y>0&&dil[j-W]&&!lab[j-W]){lab[j-W]=id;q[t++]=j-W}if(y<H-1&&dil[j+W]&&!lab[j+W]){lab[j+W]=id;q[t++]=j+W}}
+  if(cnt<10||sp/cnt<0.45)continue;
+  const w=x1-x0+1,hh=y1-y0+1,d=(w*hh*1.5)/(2*(w+hh));
+  const kx=sw/W,ky=sh/H;const bx=Math.max(0,sx+(x0-d)*kx),by=Math.max(0,sy+(y0-d)*ky);
+  boxes.push([bx,by,Math.min(img.naturalWidth-bx,(w+2*d)*kx),Math.min(img.naturalHeight-by,(hh+2*d)*ky)]);
+ }
+ return boxes.sort((a,b)=>a[1]-b[1]||a[0]-b[0]);
+}
+// Read one line. mode: null = photo as is, or a prep() treatment.
+async function pRecognize(img,box,mode){
+ let [x,y,w,h]=box;let src;
+ if(mode){src=prep(img,box,Math.max(1,Math.min(4,96/Math.max(4,h))),mode);x=0;y=0;w=src.width;h=src.height}else src=img;
+ const vertical=h>w*1.5;const lw=vertical?h:w,lh=vertical?w:h;
+ const H=48,W=Math.max(16,Math.min(1280,Math.ceil(H*lw/Math.max(1,lh))));
+ const c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d",{willReadFrequently:true});
+ if(vertical){g.translate(0,H);g.rotate(-Math.PI/2);g.drawImage(src,x,y,w,h,0,0,H,W)}else g.drawImage(src,x,y,w,h,0,0,W,H);
+ const p=g.getImageData(0,0,W,H).data,n=W*H,f=new Float32Array(3*n);
+ for(let i=0;i<n;i++){f[i]=p[i*4]/127.5-1;f[n+i]=p[i*4+1]/127.5-1;f[2*n+i]=p[i*4+2]/127.5-1}
+ const o=await P.rec.run({[P.rec.inputNames[0]]:new ort.Tensor("float32",f,[1,3,H,W])});const t=o[P.rec.outputNames[0]];
+ const [,T,C]=t.dims,d=t.data;let out="",prev=0;
+ for(let i=0;i<T;i++){let bi=0,bv=-1;for(let k=0;k<C;k++){const v=d[i*C+k];if(v>bv){bv=v;bi=k}}if(bi!==0&&bi!==prev)out+=P.keys[bi-1]||"";prev=bi}
+ return out;
+}
+async function readTextPaddle(img,l,region){
+ const W=img.naturalWidth,H=img.naturalHeight;let all="",passes=0;
+ const done=()=>{const r=findBatch(all,l.batch).r;return (r==="ok"||r==="other")&&findExp(all,l.exp)==="ok"};
+ const say=t=>$("status").textContent=t;
+ say("Finding text lines…");
+ const reg=region||[0,0,W,H];
+ let boxes=await pDetect(img,reg,region?960:1280);
+ if(!boxes.length&&region)boxes=[reg];
+ boxes=boxes.filter(b=>b[2]>6&&b[3]>6).slice(0,60);
+ const read=[];
+ for(const b of boxes){passes++;if(passes%5===0)say("Reading line "+passes+" of "+boxes.length+"…");
+  const t=await pRecognize(img,b,null);read.push({b,t});all+="\n"+t;if(done())return {text:all,passes};}
+ // batch not exact yet: read the lines that look closest again with stronger treatments
+ const lim=Math.ceil(norm(l.batch).length/2);
+ const cands=read.map(r=>({...r,d:closeness(r.t,l.batch)})).filter(r=>r.d<=lim).sort((a,b)=>a.d-b.d).slice(0,4);
+ for(const c of cands)for(const mode of ["dots","otsu","gray"]){passes++;say("Reading the batch line again… ("+mode+")");
+  const t=await pRecognize(img,c.b,mode);all+="\n"+t;if(done()||findBatch(all,l.batch).r==="ok")break;}
+ return {text:all,passes};
+}
+
+let state=null; // the photo being checked: {img,l,code,tb,quality}
+async function handle(file,region){
+ if(!file)return; resetResult();
+ const l=cur(); const img=$("prev"); img.src=URL.createObjectURL(file); img.hidden=false;
+ await img.decode().catch(()=>{});
+ const q=quality(img); const qa=$("quality");
+ qa.hidden=!(q.sharp<60||q.glare>0.12);
+ qa.textContent=q.sharp<60?"Photo looks blurry — hold steady and retake for the best result.":"Strong glare on the label — tilt the box a little and retake.";
+ const t0=performance.now();
+ let code=null; const tb0=performance.now();
+ try{ if(detector){const r=await detector.detect(img);if(r&&r.length)code=r.map(x=>x.rawValue).join(" | ")} }catch(e){}
+ if(!code){$("status").textContent="Looking for a barcode…";try{code=await scanBarcodes(img)}catch(e){code=null;$("engine").textContent+=" (barcode reader error: "+(e&&e.message||e)+")"}}
+ const tb=performance.now()-tb0;
+ state={img,l,code,tb,q};
+ await analyze(t0,region||null);
+}
+
+// ---------- live camera with a guide box (red / amber / green) ----------
+// The box turns green when the label inside it is sharp, close enough to show text, evenly lit,
+// or when a barcode with the invoice batch is already readable. Three green checks in a row capture automatically.
+let stream=null,loopT=null,greens=0,tickN=0;
+const vid=$("vid"),guide=$("guide");
+function guideRect(){const vw=vid.videoWidth,vh=vid.videoHeight;return [vw*0.08,vh*0.30,vw*0.84,vh*0.40]}
+$("live").onclick=async()=>{
+ $("liveMsg").hidden=true;
+ try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080}},audio:false})}
+ catch(e){$("liveMsg").hidden=false;$("liveMsg").textContent="Live camera is blocked on this page ("+(e&&e.name||e)+"). It needs the page to run outside claude.ai — use Take photo for now.";return}
+ resetResult();$("prev").hidden=true;$("camBox").hidden=false;$("camBtns").hidden=false;
+ vid.srcObject=stream;try{await vid.play()}catch(e){}
+ greens=0;tickN=0;tick();
+};
+function stopCam(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;clearTimeout(loopT);$("camBox").hidden=true;$("camBtns").hidden=true}
+$("camStop").onclick=stopCam;
+$("snapNow").onclick=()=>{if(stream)capture()};
+function frameStats(c){
+ const W=c.width,H=c.height,p=c.getContext("2d",{willReadFrequently:true}).getImageData(0,0,W,H).data;
+ let m=0,m2=0,k=0,edge=0,hot=0,lum=0;
+ for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){const i=(y*W+x)*4;const g=p[i];const L=4*g-p[i-4]-p[i+4]-p[i-W*4]-p[i+W*4];m+=L;m2+=L*L;k++;if(Math.abs(L)>40)edge++;if(g>=250)hot++;lum+=g}
+ m/=k;return {sharp:m2/k-m*m,edge:edge/k,glare:hot/k,lum:lum/k};
+}
+async function tick(){
+ if(!stream)return;
+ if(!vid.videoWidth){loopT=setTimeout(tick,200);return}
+ const [gx,gy,gw,gh]=guideRect(),s=Math.min(1,480/gw),c=document.createElement("canvas");c.width=Math.round(gw*s);c.height=Math.round(gh*s);
+ const g=c.getContext("2d",{willReadFrequently:true});g.filter="grayscale(1)";g.drawImage(vid,gx,gy,gw,gh,0,0,c.width,c.height);
+ const st=frameStats(c);
+ // every third check, try the barcode reader on the box at full resolution
+ let codeHit=false;
+ if(++tickN%3===0&&window.ZXingWASM){try{const fc=document.createElement("canvas");fc.width=gw;fc.height=gh;fc.getContext("2d").drawImage(vid,gx,gy,gw,gh,0,0,gw,gh);const t=await scanBarcodes(fc);codeHit=!!t&&findBatch(t,cur().batch).r==="ok"}catch(e){}}
+ let level="bad",hint;
+ if(st.lum<45)hint="More light, please";
+ else if(st.glare>0.08)hint="Glare — tilt the box a little";
+ else if(st.edge<0.035)hint="Move closer — fit the batch inside the box";
+ else if(st.sharp<70)hint="Hold steady — the label is blurred";
+ else if(st.sharp<150){level="mid";hint="Almost — hold steady"}
+ else{level="ok";hint="Hold still…"}
+ if(codeHit){level="ok";hint="Barcode found — hold still…"}
+ guide.className="guide"+(level==="ok"?" ok":level==="mid"?" mid":"");$("hint").textContent=hint;
+ $("meter").textContent="sharp "+Math.round(st.sharp)+" · text "+Math.round(st.edge*100)+"% · glare "+Math.round(st.glare*100)+"%";
+ greens=level==="ok"?greens+1:0;
+ if(greens>=3||codeHit){capture();return}
+ loopT=setTimeout(tick,250);
+}
+async function capture(){
+ const vw=vid.videoWidth,vh=vid.videoHeight,region=guideRect(),c=document.createElement("canvas");c.width=vw;c.height=vh;c.getContext("2d").drawImage(vid,0,0,vw,vh);
+ stopCam();
+ const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",0.95));
+ // read the guide box first; the whole frame is still searched for barcodes
+ await handle(blob,region);
+}
+// Tap on the photo: read only the spot around the tap.
+$("prev").addEventListener("click",async e=>{
+ if(!state||!ocrReady)return;
+ const img=state.img,r=img.getBoundingClientRect();
+ // object-fit:contain — work out where the picture sits inside the element
+ const s=Math.min(r.width/img.naturalWidth,r.height/img.naturalHeight),ox=(r.width-img.naturalWidth*s)/2,oy=(r.height-img.naturalHeight*s)/2;
+ const x=(e.clientX-r.left-ox)/s,y=(e.clientY-r.top-oy)/s; if(x<0||y<0||x>img.naturalWidth||y>img.naturalHeight)return;
+ const W=img.naturalWidth,H=img.naturalHeight,bw=W*0.6,bh=H*0.09;
+ await analyze(performance.now(),[Math.max(0,x-bw/2),Math.max(0,y-bh/2),Math.min(bw,W-Math.max(0,x-bw/2)),Math.min(bh,H-Math.max(0,y-bh/2))]);
+});
+$("typedGo").onclick=()=>{
+ if(!state)return;const t=norm($("typed").value),B=norm(state.l.batch);if(t.length<4)return;
+ const ok=B.endsWith(t);
+ render(ok?{r:"ok"}:{r:"typedbad",got:$("typed").value.toUpperCase()},last?last.ex:"bad",ok?"typed by picker":"typed — no match",0,0,performance.now(),last?last.text:"");
+};
+
+async function analyze(t0,region){
+ // Every reader gives its own evidence; the decision uses all of them.
+ const {img,l,code,tb}=state; const ev=[]; let raw="";
+ const add=(name,txt,gsExp)=>{const ex=gsExp?(gsExp[0]===l.exp[0]&&gsExp[1]===l.exp[1]?"ok":"bad"):findExp(txt,l.exp);
+  ev.push({name,b:findBatch(txt,l.batch),ex});raw+="["+name+"] "+(txt.trim()||"(nothing)")+"\n\n"};
+ if(code) add("Barcode",code,gs1Exp(code));
+ const to0=performance.now();
+ if(engineName==="paddle"){try{add("PaddleOCR",(await readTextPaddle(img,l,region)).text)}catch(e){$("status").textContent="PaddleOCR error: "+(e&&e.message||e)}}
+ // third opinion: only when nothing confirmed the batch yet, or two readers disagree
+ const okN=ev.filter(e=>e.b.r==="ok").length, otherN=ev.filter(e=>e.b.r==="other").length;
+ if((okN===0&&otherN===0)||(okN&&otherN)){ $("status").textContent="Asking a third reader (Tesseract)…";
+  if(await initTesseract()){try{add("Tesseract",(await readText(img,l,region)).text)}catch(e){}} }
+ const to=performance.now()-to0;
+ // fuse: a reader that sees a DIFFERENT known batch wins (safety); else any exact match confirms
+ const other=ev.find(e=>e.b.r==="other"), ok=ev.find(e=>e.b.r==="ok"), near=ev.find(e=>e.b.r==="near");
+ const b=other?other.b:ok?{r:"ok"}:near?near.b:{r:"bad"};
+ const ex=ev.some(e=>e.ex==="ok")?"ok":"bad";
+ const mark=e=>e.b.r==="ok"?"✅":e.b.r==="other"?"❌":e.b.r==="near"?"⚠️":"—";
+ const src=ev.length?ev.map(e=>e.name+" "+mark(e)).join(" · "):"nothing";
+ state.ev=ev;
+ render(b,ex,(region?"spot: ":"")+src,tb,to,t0,raw);
+}
+
+function render(b,ex,src,tb,to,t0,raw){
+ const l=state.l,total=performance.now()-t0;
+ $("verdict").hidden=false;
+ setPill("vBatch",b.r==="ok"?"ok":b.r==="near"?"warn":"bad", b.r==="ok"?"✅ Match":b.r==="near"?"⚠️ Close — check by eye":b.r==="other"?"❌ Different batch":b.r==="typedbad"?"❌ Typed batch differs":"❌ Not found");
+ $("fBatch").textContent = b.r==="near" ? "Read: "+b.got+" — expected: "+l.batch : b.r==="other" ? "Box says "+b.got+", invoice needs "+l.batch+". Put it back and take the right batch." : b.r==="typedbad" ? "You typed "+b.got+" — that is not the invoice batch. Check the box." : b.r==="bad" ? "Expected "+l.batch+". Photo unclear or batch not on this side." : "";
+ const needHelp=b.r==="bad"||b.r==="near"; $("tapHelp").hidden=!needHelp; $("typedBox").hidden=!needHelp&&b.r!=="typedbad";
+ setPill("vExp",ex==="ok"?"ok":"bad",ex==="ok"?"✅ Match":"❌ Not found");
+ $("fExp").textContent = ex==="ok" ? "" : "Expected "+MON[l.exp[0]-1]+" "+l.exp[1];
+ setPill("vSrc","none",src);
+ const tm=$("timings");tm.hidden=false;tm.innerHTML="";
+ [["Barcode",tb],["Text",to],["Total",total]].forEach(([k,v])=>{const s=document.createElement("span");s.textContent=k+": "+(v/1000).toFixed(1)+" s";tm.appendChild(s)});
+ $("raw").hidden=false; $("rawText").textContent=raw;
+ $("status").textContent="";
+ last={l,b:b.r,ex,src,secs:total/1000,text:raw,sharp:state.q.sharp};
+ addLog(last);
+}
+
+const logs=[];
+function addLog(x){logs.push({t:new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}),code:x.l.code+" "+x.l.batch,b:x.b,ex:x.ex,src:x.src,secs:x.secs});
+ const tb=$("logBody");tb.innerHTML="";
+ logs.slice().reverse().forEach(r=>{const tr=document.createElement("tr");
+  [r.t,r.code,r.b==="ok"?"✅":r.b==="near"?"⚠️":r.b==="other"?"❌ other batch":"❌",r.ex==="ok"?"✅":"❌",r.src,r.secs.toFixed(1)+" s"].forEach(v=>{const td=document.createElement("td");td.textContent=v;tr.appendChild(td)});tb.appendChild(tr)})}
+
+$("check").onclick=()=>{
+ const f=$("final");f.hidden=false;const q=$("qty").value;
+ if(!last){f.className="big warn";f.textContent="Photograph the label first";return}
+ if(q===""){f.className="big warn";f.textContent="Enter the quantity";return}
+ const l=last.l, n=+q;
+ if(last.b==="other"){f.className="big bad";f.textContent="ERROR — different batch";return}
+ if(last.b!=="ok"){f.className="big bad";f.textContent="ERROR — batch not confirmed";return}
+ if(last.ex!=="ok"){f.className="big warn";f.textContent="Batch OK, expiry not read";return}
+ if(n!==l.qty){f.className="big bad";f.textContent="ERROR — picked "+n+", invoice "+l.qty+" ("+(n>l.qty?"over ":"short ")+Math.abs(n-l.qty)+")";return}
+ f.className="big ok";f.textContent="PASS ✅";
+};
+$("copy").onclick=async()=>{
+ const txt=logs.map(r=>[r.t,r.code,"batch:"+r.b,"exp:"+r.ex,r.src,r.secs.toFixed(1)+"s"].join(" | ")).join("\n")||"no trials";
+ try{await navigator.clipboard.writeText(txt);$("copyMsg").textContent="Copied ✓"}catch(e){$("copyMsg").textContent=txt}
+};
+showExpect();
+</script>
+
+</body></html>
